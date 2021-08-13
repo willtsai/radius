@@ -1,4 +1,6 @@
 param ESHOP_EXTERNAL_DNS_NAME_OR_IP string = 'localhost'
+param OCHESTRATOR_TYPE string = 'K8S'
+param APPLICATION_INSIGHTS_KEY string = ''
 
 resource eshop 'radius.dev/Applications@v1alpha1' = {
   name: 'eShop'
@@ -14,13 +16,13 @@ resource eshop 'radius.dev/Applications@v1alpha1' = {
         container: {
           image: 'eshop/identity.api:latest'
           env: {
-            'PATH_BASE': ''
+            'PATH_BASE': '/identity-api'
             'ASPNETCORE_ENVIRONMENT': 'Development'
             'ASPNETCORE_URLS': 'http://0.0.0.0:80'
-            'OrchestratorType': 'K8S'
+            'OrchestratorType': '${OCHESTRATOR_TYPE}'
             'IsClusterEnv': 'True'
             'DPConnectionString': ''
-            'ApplicationInsights__InstrumentationKey': ''
+            'ApplicationInsights__InstrumentationKey': '${APPLICATION_INSIGHTS_KEY}'
             'XamarinCallback': ''
             'EnableDevspaces': 'False'
           }
@@ -104,12 +106,12 @@ resource eshop 'radius.dev/Applications@v1alpha1' = {
             'UseCustomizationData': 'False'
             'PATH_BASE': '/catalog-api'
             'ASPNETCORE_ENVIRONMENT': 'Development'
-            'OrchestratorType': 'K8S'
+            'OrchestratorType': '${OCHESTRATOR_TYPE}'
             'PORT': '80'
             'GRPC_PORT': '81'
             'PicBaseUrl': ''
             'AzureStorageEnabled': 'False'
-            'ApplicationInsights__InstrumentationKey': ''
+            'ApplicationInsights__InstrumentationKey': '${APPLICATION_INSIGHTS_KEY}'
             'AzureServiceBusEnabled': 'True'
           }
         }
@@ -163,8 +165,8 @@ resource eshop 'radius.dev/Applications@v1alpha1' = {
             'UseCustomizationData': 'False'
             'AzureServiceBusEnabled': 'True'
             'CheckUpdateTime': '30000'
-            'ApplicationInsights__InstrumentationKey': ''
-            'OrchestratorType': 'K8S'
+            'ApplicationInsights__InstrumentationKey': '${APPLICATION_INSIGHTS_KEY}'
+            'OrchestratorType': '${OCHESTRATOR_TYPE}'
             'UseLoadTest': 'False'
             'Serilog__MinimumLevel__Override__Microsoft.eShopOnContainers.BuildingBlocks.EventBusRabbitMQ': 'Verbose'
             'Serilog__MinimumLevel__Override__ordering-api': 'Verbose'
@@ -223,10 +225,10 @@ resource eshop 'radius.dev/Applications@v1alpha1' = {
           env: {
             'ASPNETCORE_ENVIRONMENT': 'Development'
             'ASPNETCORE_URLS': 'http://0.0.0.0:80'
-            'ApplicationInsights__InstrumentationKey': ''
+            'ApplicationInsights__InstrumentationKey': '${APPLICATION_INSIGHTS_KEY}'
             'UseLoadTest': 'False'
             'PATH_BASE': '/basket-api'
-            'OrchestratorType': 'K8S'
+            'OrchestratorType': '${OCHESTRATOR_TYPE}'
             'PORT': '80'
             'GRPC_PORT': '81'
             'AzureServiceBusEnabled': 'True'
@@ -285,7 +287,7 @@ resource eshop 'radius.dev/Applications@v1alpha1' = {
           env: {
             'ASPNETCORE_ENVIRONMENT': 'Development'
             'ASPNETCORE_URLS': 'http://0.0.0.0:80'
-            'OrchestratorType': 'K8S'
+            'OrchestratorType': '${OCHESTRATOR_TYPE}'
             'AzureServiceBusEnabled': 'True'
           }
         }
@@ -334,10 +336,10 @@ resource eshop 'radius.dev/Applications@v1alpha1' = {
           env: {
             'ASPNETCORE_ENVIRONMENT': 'Development'
             'ASPNETCORE_URLS': 'http://0.0.0.0:80'
-            'ApplicationInsights__InstrumentationKey': ''
+            'ApplicationInsights__InstrumentationKey': '${APPLICATION_INSIGHTS_KEY}'
             'Serilog__MinimumLevel__Override__payment-api.IntegrationEvents.EventHandling': 'Verbose'
             'Serilog__MinimumLevel__Override__Microsoft.eShopOnContainers.BuildingBlocks.EventBusRabbitMQ': 'Verbose'
-            'OrchestratorType': 'K8S'
+            'OrchestratorType': '${OCHESTRATOR_TYPE}'
             'AzureServiceBusEnabled': 'True'
           }
         }
@@ -376,10 +378,10 @@ resource eshop 'radius.dev/Applications@v1alpha1' = {
             'UseCustomizationData': 'False'
             'CheckUpdateTime': '30000'
             'GracePeriodTime': '1'
-            'ApplicationInsights__InstrumentationKey': ''
+            'ApplicationInsights__InstrumentationKey': '${APPLICATION_INSIGHTS_KEY}'
             'UseLoadTest': 'False'
             'Serilog__MinimumLevel__Override__Microsoft.eShopOnContainers.BuildingBlocks.EventBusRabbitMQ': 'Verbose'
-            'OrchestratorType': 'K8S'
+            'OrchestratorType': '${OCHESTRATOR_TYPE}'
             'AzureServiceBusEnabled': 'True'
           }
         }
@@ -509,8 +511,8 @@ resource eshop 'radius.dev/Applications@v1alpha1' = {
           env: {
             'ASPNETCORE_ENVIRONMENT': 'Development'
             'ASPNETCORE_URLS': 'http://0.0.0.0:80'
-            'ApplicationInsights__InstrumentationKey': ''
-            'OrchestratorType': 'K8S'
+            'ApplicationInsights__InstrumentationKey': '${APPLICATION_INSIGHTS_KEY}'
+            'OrchestratorType': '${OCHESTRATOR_TYPE}'
             'IsClusterEnv': 'True'
             'AzureServiceBusEnabled': 'True'
           }
@@ -629,8 +631,8 @@ resource eshop 'radius.dev/Applications@v1alpha1' = {
             'HealthChecksUI__HealthChecks__9__Uri': 'http://ordering-signalrhub/hc'
             'HealthChecksUI__HealthChecks__10__Name': 'Ordering HTTP Background Check'
             'HealthChecksUI__HealthChecks__10__Uri': 'http://ordering-backgroundtasks/hc'
-            'ApplicationInsights__InstrumentationKey': ''
-            'OrchestratorType': 'K8S'
+            'ApplicationInsights__InstrumentationKey': '${APPLICATION_INSIGHTS_KEY}'
+            'OrchestratorType': '${OCHESTRATOR_TYPE}'
           }
         }
       }
@@ -660,8 +662,8 @@ resource eshop 'radius.dev/Applications@v1alpha1' = {
             'ASPNETCORE_ENVIRONMENT': 'Production'
             'ASPNETCORE_URLS': 'http://0.0.0.0:80'
             'UseCustomizationData': 'False'
-            'ApplicationInsights__InstrumentationKey': ''
-            'OrchestratorType': 'K8S'
+            'ApplicationInsights__InstrumentationKey': '${APPLICATION_INSIGHTS_KEY}'
+            'OrchestratorType': '${OCHESTRATOR_TYPE}'
             'IsClusterEnv': 'True'
           }
         }
@@ -717,9 +719,9 @@ resource eshop 'radius.dev/Applications@v1alpha1' = {
             'ASPNETCORE_ENVIRONMENT': 'Development'
             'ASPNETCORE_URLS': 'http://0.0.0.0:80'
             'UseCustomizationData': 'False'
-            'ApplicationInsights__InstrumentationKey': ''
+            'ApplicationInsights__InstrumentationKey': '${APPLICATION_INSIGHTS_KEY}'
             'UseLoadTest': 'False'
-            'OrchestratorType': 'K8S'
+            'OrchestratorType': '${OCHESTRATOR_TYPE}'
             'IsClusterEnv': 'True'
           }
         }
