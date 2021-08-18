@@ -197,6 +197,7 @@ func (r *rp) GetComponent(ctx context.Context, id resources.ResourceID) (rest.Re
 	}
 
 	item := newRESTComponentFromDB(dbitem)
+
 	return rest.NewOKResponse(item), nil
 }
 
@@ -438,7 +439,7 @@ func (r *rp) UpdateDeployment(ctx context.Context, d *rest.Deployment) (rest.Res
 			// Composite error is what we use for validation problems
 			status = rest.FailedStatus
 			failure = &armerrors.ErrorDetails{
-				Code:    armerrors.CodeInvalid,
+				Code:    armerrors.Invalid,
 				Message: err.Error(),
 				Target:  id.Resource.ID,
 			}
@@ -447,7 +448,7 @@ func (r *rp) UpdateDeployment(ctx context.Context, d *rest.Deployment) (rest.Res
 			// Other errors represent a generic failure, this should map to a 500.
 			status = rest.FailedStatus
 			failure = &armerrors.ErrorDetails{
-				Code:    armerrors.CodeInternal,
+				Code:    armerrors.Internal,
 				Message: err.Error(),
 				Target:  id.Resource.ID,
 			}
@@ -501,19 +502,18 @@ func (r *rp) UpdateDeployment(ctx context.Context, d *rest.Deployment) (rest.Res
 			if action.Operation == deployment.DeleteWorkload {
 				// clear out deployment resources since the component was undeployed
 				definition := a.Components[c]
-				definition.Properties.OutputResources = nil
+				definition.Properties.Status.OutputResources = nil
 				a.Components[c] = definition
 			} else if action.Operation != deployment.None {
 				// if the component was updated or created add its resources
-				logger.Info(fmt.Sprintf("Updating component with %v output resources", len(action.Definition.Properties.OutputResources)))
+				logger.Info(fmt.Sprintf("Updating component with %v output resources", len(action.Definition.Properties.Status.OutputResources)))
 				a.Components[c] = *action.Definition
 			}
 
 		}
 
 		logger.Info("Updating application")
-		ok, err := r.db.UpdateApplication(ctx, a)
-		if err != nil || !ok {
+		if _, err = r.db.UpdateApplication(ctx, a); err != nil {
 			logger.Error(err, "failed to update application")
 			return
 		}
@@ -582,14 +582,14 @@ func (r *rp) DeleteDeployment(ctx context.Context, id resources.ResourceID) (res
 			// Composite error is what we use for validation problems
 			status = rest.FailedStatus
 			failure = &armerrors.ErrorDetails{
-				Code:    armerrors.CodeInvalid,
+				Code:    armerrors.Invalid,
 				Message: err.Error(),
 				Target:  d.Resource.ID,
 			}
 		} else if err != nil {
 			status = rest.FailedStatus
 			failure = &armerrors.ErrorDetails{
-				Code:    armerrors.CodeInternal,
+				Code:    armerrors.Internal,
 				Message: err.Error(),
 				Target:  d.Resource.ID,
 			}
@@ -760,7 +760,7 @@ func (r *rp) GetDeploymentOperationByID(ctx context.Context, id resources.Resour
 	// The resource body just has the provisioning status, and doesn't have the ability to give a reason
 	// for failure. We use the operation for that. If there's a failure, return it in the ARM format,
 	// otherwise we just want to return the same thing the deployment resource would return.
-	if operation.Error != nil && operation.Error.Code == armerrors.CodeInvalid {
+	if operation.Error != nil && operation.Error.Code == armerrors.Invalid {
 		// Operation failed with a validation or business logic error
 		return rest.NewBadRequestARMResponse(armerrors.ErrorResponse{
 			Error: *operation.Error,

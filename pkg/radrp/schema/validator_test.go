@@ -73,14 +73,14 @@ func TestComponentValidator(t *testing.T) {
                     "bindings":        42,
                     "uses":            42,
                     "traits":          42,
-                    "outputResources": 42
+                    "status":          42
                   }
                 }`,
 		expects: append(append(
 			invalidTypeErrs("(root).properties", "object", "integer",
-				"config", "run", "bindings"),
+				"config", "run", "bindings", "status"),
 			invalidTypeErrs("(root).properties", "array", "integer",
-				"uses", "traits", "outputResources")...),
+				"uses", "traits")...),
 			invalidTypeErr("(root).properties.revision", "string", "integer")),
 	}, {
 		name: "unrecognized trait.* fields",
@@ -131,6 +131,38 @@ func TestComponentValidator(t *testing.T) {
                   }
                 }`,
 		expects: additionalFieldErrs("(root).properties.traits.0", "appId"),
+	}, {
+		name: "valid ManualScalingTrait",
+		input: `{
+			"id": "id", "name": "name", "kind": "kind", "location": "location",
+			"properties": {
+			  "traits": [{
+				"kind":     "radius.dev/ManualScaling@v1alpha1",
+				"replicas":    2
+			  }]
+			}
+		  }`,
+	}, {
+		name: "valid binding expressions",
+		input: `{
+                  "id": "id", "name": "name", "kind": "kind", "location": "location",
+                  "properties": {
+                    "uses": [
+                      {
+                        "binding": "[[reference(resourceId('Microsoft.CustomProviders/resourceProviders/Applications/Components', 'radius', 'frontend-backend', 'frontend')).bindings.default]",
+                        "env": {
+                          "SERVICE__BACKEND__HOST": "[[reference(resourceId('Microsoft.CustomProviders/resourceProviders/Applications/Components', 'radius', 'frontend-backend', 'frontend')).bindings.default.host]"
+                        },
+                        "secrets": {
+                          "store": "[[reference(resourceId('Microsoft.CustomProviders/resourceProviders/Applications/Components', 'radius', 'frontend-backend', 'frontend')).bindings.default]",
+                          "keys": {
+                            "secret": "[[reference(resourceId('Microsoft.CustomProviders/resourceProviders/Applications/Components', 'radius', 'frontend-backend', 'frontend')).bindings.default]"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }`,
 	}} {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := v.ValidateJSON([]byte(tc.input))

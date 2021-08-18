@@ -23,6 +23,8 @@ func unmarshalComponentTraitClassification(rawMsg json.RawMessage) (ComponentTra
 		b = &DaprTrait{}
 	case "radius.dev/InboundRoute@v1alpha1":
 		b = &InboundRouteTrait{}
+	case "radius.dev/ManualScaling@v1alpha1":
+		b = &ManualScalingTrait{}
 	default:
 		b = &ComponentTrait{}
 	}

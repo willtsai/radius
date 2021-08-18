@@ -52,11 +52,17 @@ type ApplicationListByResourceGroupOptions struct {
 	// placeholder for future optional parameters
 }
 
+// ApplicationProperties - Properties of an application.
+type ApplicationProperties struct {
+	// Status of the application
+	Status *ApplicationStatus `json:"status,omitempty"`
+}
+
 // ApplicationResource - Application resource.
 type ApplicationResource struct {
 	TrackedResource
 	// Properties of the application.
-	Properties map[string]interface{} `json:"properties,omitempty"`
+	Properties *ApplicationProperties `json:"properties,omitempty"`
 }
 
 // MarshalJSON implements the json.Marshaller interface for type ApplicationResource.
@@ -64,6 +70,21 @@ func (a ApplicationResource) MarshalJSON() ([]byte, error) {
 	objectMap := a.TrackedResource.marshalInternal()
 	populate(objectMap, "properties", a.Properties)
 	return json.Marshal(objectMap)
+}
+
+// ApplicationStatus - Status of an application.
+type ApplicationStatus struct {
+	// Health errors for the application
+	HealthErrorDetails *string `json:"healthErrorDetails,omitempty"`
+
+	// Health state of the application
+	HealthState *string `json:"healthState,omitempty"`
+
+	// Provisioning errors for the application
+	ProvisioningErrorDetails *string `json:"provisioningErrorDetails,omitempty"`
+
+	// Provisioning state of the application
+	ProvisioningState *string `json:"provisioningState,omitempty"`
 }
 
 // ComponentCreateOrUpdateOptions contains the optional parameters for the Component.CreateOrUpdate method.
@@ -83,6 +104,41 @@ type ComponentCreateParameters struct {
 // ComponentDeleteOptions contains the optional parameters for the Component.Delete method.
 type ComponentDeleteOptions struct {
 	// placeholder for future optional parameters
+}
+
+// ComponentDependency - A binding used by an Radius Component
+type ComponentDependency struct {
+	Binding *string `json:"binding,omitempty"`
+
+	// Dictionary of
+	Env map[string]*string `json:"env,omitempty"`
+
+	// Actions to take on a secret store as part of a binding
+	Secrets *ComponentDependencySecrets `json:"secrets,omitempty"`
+}
+
+// MarshalJSON implements the json.Marshaller interface for type ComponentDependency.
+func (c ComponentDependency) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	populate(objectMap, "binding", c.Binding)
+	populate(objectMap, "env", c.Env)
+	populate(objectMap, "secrets", c.Secrets)
+	return json.Marshal(objectMap)
+}
+
+// ComponentDependencySecrets - Actions to take on a secret store as part of a binding
+type ComponentDependencySecrets struct {
+	// Dictionary of
+	Keys map[string]*string `json:"keys,omitempty"`
+	Store *string `json:"store,omitempty"`
+}
+
+// MarshalJSON implements the json.Marshaller interface for type ComponentDependencySecrets.
+func (c ComponentDependencySecrets) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	populate(objectMap, "keys", c.Keys)
+	populate(objectMap, "store", c.Store)
+	return json.Marshal(objectMap)
 }
 
 // ComponentGetOptions contains the optional parameters for the Component.Get method.
@@ -115,7 +171,6 @@ type ComponentProperties struct {
 
 	// Config of the component
 	Config map[string]interface{} `json:"config,omitempty"`
-	OutputResources []map[string]interface{} `json:"outputResources,omitempty"`
 
 	// Revision of the component
 	Revision *string `json:"revision,omitempty"`
@@ -123,11 +178,14 @@ type ComponentProperties struct {
 	// Run spec of the component
 	Run map[string]interface{} `json:"run,omitempty"`
 
+	// Status of the component
+	Status *ComponentStatus `json:"status,omitempty"`
+
 	// Traits spec of the component
 	Traits []ComponentTraitClassification `json:"traits,omitempty"`
 
 	// Uses spec of the component
-	Uses []map[string]interface{} `json:"uses,omitempty"`
+	Uses []*ComponentDependency `json:"uses,omitempty"`
 }
 
 // MarshalJSON implements the json.Marshaller interface for type ComponentProperties.
@@ -135,9 +193,9 @@ func (c ComponentProperties) MarshalJSON() ([]byte, error) {
 	objectMap := make(map[string]interface{})
 	populate(objectMap, "bindings", c.Bindings)
 	populate(objectMap, "config", c.Config)
-	populate(objectMap, "outputResources", c.OutputResources)
 	populate(objectMap, "revision", c.Revision)
 	populate(objectMap, "run", c.Run)
+	populate(objectMap, "status", c.Status)
 	populate(objectMap, "traits", c.Traits)
 	populate(objectMap, "uses", c.Uses)
 	return json.Marshal(objectMap)
@@ -158,14 +216,14 @@ func (c *ComponentProperties) UnmarshalJSON(data []byte) error {
 		case "config":
 				err = unpopulate(val, &c.Config)
 				delete(rawMsg, key)
-		case "outputResources":
-				err = unpopulate(val, &c.OutputResources)
-				delete(rawMsg, key)
 		case "revision":
 				err = unpopulate(val, &c.Revision)
 				delete(rawMsg, key)
 		case "run":
 				err = unpopulate(val, &c.Run)
+				delete(rawMsg, key)
+		case "status":
+				err = unpopulate(val, &c.Status)
 				delete(rawMsg, key)
 		case "traits":
 				c.Traits, err = unmarshalComponentTraitClassificationArray(val)
@@ -199,10 +257,29 @@ func (c ComponentResource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(objectMap)
 }
 
+// ComponentStatus - Status of a component.
+type ComponentStatus struct {
+	// Health state of the component
+	HealthState *string `json:"healthState,omitempty"`
+	OutputResources []map[string]interface{} `json:"outputResources,omitempty"`
+
+	// Provisioning state of the component
+	ProvisioningState *string `json:"provisioningState,omitempty"`
+}
+
+// MarshalJSON implements the json.Marshaller interface for type ComponentStatus.
+func (c ComponentStatus) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	populate(objectMap, "healthState", c.HealthState)
+	populate(objectMap, "outputResources", c.OutputResources)
+	populate(objectMap, "provisioningState", c.ProvisioningState)
+	return json.Marshal(objectMap)
+}
+
 // ComponentTraitClassification provides polymorphic access to related types.
 // Call the interface's GetComponentTrait() method to access the common type.
 // Use a type switch to determine the concrete type.  The possible types are:
-// - *ComponentTrait, *DaprTrait, *InboundRouteTrait
+// - *ComponentTrait, *DaprTrait, *InboundRouteTrait, *ManualScalingTrait
 type ComponentTraitClassification interface {
 	// GetComponentTrait returns the ComponentTrait content of the underlying type.
 	GetComponentTrait() *ComponentTrait
@@ -210,7 +287,7 @@ type ComponentTraitClassification interface {
 
 // ComponentTrait - Trait of a component.
 type ComponentTrait struct {
-	// REQUIRED; Component kind.
+	// REQUIRED; Trait kind.
 	Kind *string `json:"kind,omitempty"`
 }
 
@@ -458,6 +535,40 @@ func (i *InboundRouteTrait) UnmarshalJSON(data []byte) error {
 		}
 	}
 	return i.ComponentTrait.unmarshalInternal(rawMsg)
+}
+
+// ManualScalingTrait - ManualScaling ComponentTrait
+type ManualScalingTrait struct {
+	ComponentTrait
+	// Replica count.
+	Replicas *int32 `json:"replicas,omitempty"`
+}
+
+// MarshalJSON implements the json.Marshaller interface for type ManualScalingTrait.
+func (m ManualScalingTrait) MarshalJSON() ([]byte, error) {
+	objectMap := m.ComponentTrait.marshalInternal("radius.dev/ManualScaling@v1alpha1")
+	populate(objectMap, "replicas", m.Replicas)
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON implements the json.Unmarshaller interface for type ManualScalingTrait.
+func (m *ManualScalingTrait) UnmarshalJSON(data []byte) error {
+	var rawMsg map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawMsg); err != nil {
+		return err
+	}
+	for key, val := range rawMsg {
+		var err error
+		switch key {
+		case "replicas":
+				err = unpopulate(val, &m.Replicas)
+				delete(rawMsg, key)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return m.ComponentTrait.unmarshalInternal(rawMsg)
 }
 
 // Resource - Common fields that are returned in the response for all Azure Resource Manager resources

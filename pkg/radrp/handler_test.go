@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/Azure/radius/mocks"
+	"github.com/Azure/radius/pkg/azresources"
 	"github.com/Azure/radius/pkg/model/revision"
 	"github.com/Azure/radius/pkg/radlogger"
 	"github.com/Azure/radius/pkg/radrp/armerrors"
@@ -111,11 +112,12 @@ func scopeID(applicationName string, scopeName string) resources.ResourceID {
 }
 
 func parseOrPanic(id string) resources.ResourceID {
-	res, err := resources.Parse(id)
+	res, err := azresources.Parse(id)
 	if err != nil {
 		panic(err)
 	}
-	return res
+	rid := resources.ResourceID{ResourceID: res}
+	return rid
 }
 
 func requireJSON(t *testing.T, expected interface{}, w *httptest.ResponseRecorder) {
@@ -124,7 +126,7 @@ func requireJSON(t *testing.T, expected interface{}, w *httptest.ResponseRecorde
 	require.JSONEq(t, string(bytes), w.Body.String())
 }
 
-func (test *test) DBCreateApplication(applicationName string, properties map[string]interface{}) {
+func (test *test) DBCreateApplication(applicationName string, properties db.ApplicationProperties) {
 	applicationID := applicationID(applicationName)
 	_, err := test.db.PatchApplication(context.TODO(), &db.ApplicationPatch{
 		ResourceBase: db.ResourceBase{
@@ -345,6 +347,7 @@ func Test_GetApplication_NotFound(t *testing.T) {
 
 	expected := &armerrors.ErrorResponse{
 		Error: armerrors.ErrorDetails{
+			Code:    armerrors.NotFound,
 			Target:  id.ID,
 			Message: fmt.Sprintf("the resource with id '%s' was not found", id.ID),
 		},
@@ -355,7 +358,7 @@ func Test_GetApplication_NotFound(t *testing.T) {
 func Test_GetApplication_Found(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	applicationID := applicationID(TestApplicationName)
 	req := httptest.NewRequest("GET", applicationID.ID, nil)
@@ -394,7 +397,7 @@ func Test_ListApplications_Empty(t *testing.T) {
 func Test_ListApplications_Found(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	req := httptest.NewRequest("GET", applicationList().ID, nil)
 	w := httptest.NewRecorder()
@@ -462,7 +465,7 @@ func Test_UpdateApplication_Create(t *testing.T) {
 			Name:           applicationID.Name(),
 			Type:           applicationID.Kind(),
 		},
-		Properties: map[string]interface{}{},
+		Properties: rest.ApplicationProperties{},
 	}
 	requireJSON(t, expected, w)
 }
@@ -470,7 +473,7 @@ func Test_UpdateApplication_Create(t *testing.T) {
 func Test_UpdateApplication_Update(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	body := map[string]interface{}{
 		"properties": map[string]interface{}{},
@@ -498,7 +501,7 @@ func Test_UpdateApplication_Update(t *testing.T) {
 			Name:           applicationID.Name(),
 			Type:           applicationID.Kind(),
 		},
-		Properties: map[string]interface{}{},
+		Properties: rest.ApplicationProperties{},
 	}
 	requireJSON(t, expected, w)
 }
@@ -518,7 +521,7 @@ func Test_DeleteApplication_NotFound(t *testing.T) {
 func Test_DeleteApplication_Found(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	id := applicationID(TestApplicationName)
 	req := httptest.NewRequest("DELETE", id.ID, nil)
@@ -542,6 +545,7 @@ func Test_GetComponent_NoApplication(t *testing.T) {
 
 	expected := &armerrors.ErrorResponse{
 		Error: armerrors.ErrorDetails{
+			Code:    armerrors.NotFound,
 			Target:  id.ID,
 			Message: fmt.Sprintf("the resource with id '%s' was not found", id.ID),
 		},
@@ -552,7 +556,7 @@ func Test_GetComponent_NoApplication(t *testing.T) {
 func Test_GetComponent_NotFound(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	id := componentID(TestApplicationName, "A")
 	req := httptest.NewRequest("GET", id.ID, nil)
@@ -564,6 +568,7 @@ func Test_GetComponent_NotFound(t *testing.T) {
 
 	expected := &armerrors.ErrorResponse{
 		Error: armerrors.ErrorDetails{
+			Code:    armerrors.NotFound,
 			Target:  id.ID,
 			Message: fmt.Sprintf("the resource with id '%s' was not found", id.ID),
 		},
@@ -574,7 +579,7 @@ func Test_GetComponent_NotFound(t *testing.T) {
 func Test_GetComponent_Found(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	rev := test.DBCreateComponent(TestApplicationName, "A", "radius.dev/Test@v1alpha1", db.ComponentProperties{})
 
 	componentID := componentID(TestApplicationName, "A")
@@ -617,6 +622,7 @@ func Test_ListComponents_NoApplication(t *testing.T) {
 
 	expected := &armerrors.ErrorResponse{
 		Error: armerrors.ErrorDetails{
+			Code:    armerrors.NotFound,
 			Target:  a.ID,
 			Message: fmt.Sprintf("the resource with id '%s' was not found", a.ID),
 		},
@@ -627,7 +633,7 @@ func Test_ListComponents_NoApplication(t *testing.T) {
 func Test_ListComponents_Empty(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	id := componentList(TestApplicationName)
 	req := httptest.NewRequest("GET", id.ID, nil)
@@ -644,7 +650,7 @@ func Test_ListComponents_Empty(t *testing.T) {
 func Test_ListComponents_Found(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	rev := test.DBCreateComponent(TestApplicationName, "A", "radius.dev/Test@v1alpha1", db.ComponentProperties{})
 
 	req := httptest.NewRequest("GET", componentList(TestApplicationName).ID, nil)
@@ -696,6 +702,7 @@ func Test_UpdateComponent_NoApplication(t *testing.T) {
 
 	expected := &armerrors.ErrorResponse{
 		Error: armerrors.ErrorDetails{
+			Code:    armerrors.NotFound,
 			Target:  a.ID,
 			Message: fmt.Sprintf("the resource with id '%s' was not found", a.ID),
 		},
@@ -706,10 +713,13 @@ func Test_UpdateComponent_NoApplication(t *testing.T) {
 func Test_UpdateComponent_Create(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	// simulate the operation to get the revision
-	rev := test.DBCreateComponent(TestApplicationName, "A", "radius.dev/Test@v1alpha1", db.ComponentProperties{})
+	rev := test.DBCreateComponent(TestApplicationName, "A", "radius.dev/Test@v1alpha1", db.ComponentProperties{
+		Status: db.ComponentStatus{
+			ProvisioningState: "NotProvisioned",
+			HealthState:       "Unhealthy"}})
 	test.DBDeleteComponent(TestApplicationName, "A")
 
 	body := map[string]interface{}{
@@ -738,6 +748,10 @@ func Test_UpdateComponent_Create(t *testing.T) {
 		Kind: "radius.dev/Test@v1alpha1",
 		Properties: rest.ComponentProperties{
 			Revision: rev,
+			Status: rest.ComponentStatus{
+				ProvisioningState: "NotProvisioned",
+				HealthState:       "Unhealthy",
+			},
 		},
 	}
 	requireJSON(t, expected, w)
@@ -746,8 +760,11 @@ func Test_UpdateComponent_Create(t *testing.T) {
 func Test_UpdateComponent_UpdateNoOp(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
-	rev := test.DBCreateComponent(TestApplicationName, "A", "radius.dev/Test@v1alpha1", db.ComponentProperties{})
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
+	rev := test.DBCreateComponent(TestApplicationName, "A", "radius.dev/Test@v1alpha1", db.ComponentProperties{
+		Status: db.ComponentStatus{
+			ProvisioningState: "NotProvisioned",
+			HealthState:       "Unhealthy"}})
 
 	body := map[string]interface{}{
 		"kind":       "radius.dev/Test@v1alpha1",
@@ -775,6 +792,10 @@ func Test_UpdateComponent_UpdateNoOp(t *testing.T) {
 		Kind: "radius.dev/Test@v1alpha1",
 		Properties: rest.ComponentProperties{
 			Revision: rev,
+			Status: rest.ComponentStatus{
+				ProvisioningState: "NotProvisioned",
+				HealthState:       "Unhealthy",
+			},
 		},
 	}
 	requireJSON(t, expected, w)
@@ -783,12 +804,16 @@ func Test_UpdateComponent_UpdateNoOp(t *testing.T) {
 func Test_UpdateComponent_Update(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	// Simulate the operation to get the revision
 	test.DBCreateComponent(TestApplicationName, "A", "radius.dev/Test@v1alpha1", db.ComponentProperties{})
 	rev := test.DBCreateComponent(TestApplicationName, "A", "radius.dev/Test@v1alpha1", db.ComponentProperties{
 		Run: map[string]interface{}{
 			"cool": true,
+		},
+		Status: db.ComponentStatus{
+			ProvisioningState: "NotProvisioned",
+			HealthState:       "Unhealthy",
 		},
 	})
 	test.DBDeleteComponent(TestApplicationName, "A")
@@ -827,6 +852,10 @@ func Test_UpdateComponent_Update(t *testing.T) {
 			Run: map[string]interface{}{
 				"cool": true,
 			},
+			Status: rest.ComponentStatus{
+				ProvisioningState: "NotProvisioned",
+				HealthState:       "Unhealthy",
+			},
 		},
 	}
 	requireJSON(t, expected, w)
@@ -847,7 +876,7 @@ func Test_DeleteComponent_NoApplication(t *testing.T) {
 func Test_DeleteComponent_NotFound(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	id := componentID(TestApplicationName, "A")
 	req := httptest.NewRequest("DELETE", id.ID, nil)
@@ -861,7 +890,7 @@ func Test_DeleteComponent_NotFound(t *testing.T) {
 func Test_DeleteComponent_Found(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	test.DBCreateComponent(TestApplicationName, "A", "radius.dev/Test@v1alpha1", db.ComponentProperties{})
 
 	id := componentID(TestApplicationName, "default")
@@ -886,6 +915,7 @@ func Test_GetDeployment_NoApplication(t *testing.T) {
 
 	expected := &armerrors.ErrorResponse{
 		Error: armerrors.ErrorDetails{
+			Code:    armerrors.NotFound,
 			Target:  id.ID,
 			Message: fmt.Sprintf("the resource with id '%s' was not found", id.ID),
 		},
@@ -896,7 +926,7 @@ func Test_GetDeployment_NoApplication(t *testing.T) {
 func Test_GetDeployment_NotFound(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	id := deploymentID(TestApplicationName, "default")
 	req := httptest.NewRequest("GET", id.ID, nil)
@@ -908,6 +938,7 @@ func Test_GetDeployment_NotFound(t *testing.T) {
 
 	expected := &armerrors.ErrorResponse{
 		Error: armerrors.ErrorDetails{
+			Code:    armerrors.NotFound,
 			Target:  id.ID,
 			Message: fmt.Sprintf("the resource with id '%s' was not found", id.ID),
 		},
@@ -918,7 +949,7 @@ func Test_GetDeployment_NotFound(t *testing.T) {
 func Test_GetDeployment_Found(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	test.DBCreateDeployment(TestApplicationName, "default", db.DeploymentProperties{})
 
 	deploymentID := deploymentID(TestApplicationName, "default")
@@ -958,6 +989,7 @@ func Test_ListDeployments_NoApplication(t *testing.T) {
 
 	expected := &armerrors.ErrorResponse{
 		Error: armerrors.ErrorDetails{
+			Code:    armerrors.NotFound,
 			Target:  a.ID,
 			Message: fmt.Sprintf("the resource with id '%s' was not found", a.ID),
 		},
@@ -968,7 +1000,7 @@ func Test_ListDeployments_NoApplication(t *testing.T) {
 func Test_ListDeployments_Empty(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	id := deploymentList(TestApplicationName)
 	req := httptest.NewRequest("GET", id.ID, nil)
@@ -985,7 +1017,7 @@ func Test_ListDeployments_Empty(t *testing.T) {
 func Test_ListDeployments_Found(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	test.DBCreateDeployment(TestApplicationName, "default", db.DeploymentProperties{})
 
 	req := httptest.NewRequest("GET", deploymentList(TestApplicationName).ID, nil)
@@ -1035,6 +1067,7 @@ func Test_UpdateDeployment_NoApplication(t *testing.T) {
 
 	expected := &armerrors.ErrorResponse{
 		Error: armerrors.ErrorDetails{
+			Code:    armerrors.NotFound,
 			Target:  a.ID,
 			Message: fmt.Sprintf("the resource with id '%s' was not found", a.ID),
 		},
@@ -1059,7 +1092,7 @@ func Test_UpdateDeployment_Create(t *testing.T) {
 			}
 		})
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	body := map[string]interface{}{
 		"properties": map[string]interface{}{
@@ -1105,29 +1138,12 @@ func Test_UpdateDeployment_Create(t *testing.T) {
 func Test_UpdateDeployment_Create_ValidationFailure(t *testing.T) {
 	test := start(t)
 
-	// This test will call through to the deployment processor to create a deployment. For now we don't validate any
-	// of the data, and just simulate invalid data.
-	complete := make(chan struct{})
-	test.deploy.EXPECT().
-		UpdateDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(a, b, c, d, e interface{}) error {
-			select {
-			case <-complete:
-				return &deployment.CompositeError{
-					Errors: []error{
-						errors.New("deployment was invalid :("),
-					},
-				}
-			case <-time.After(10 * time.Second):
-				return errors.New("timed out")
-			}
-		})
-
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	body := map[string]interface{}{
+		"name": 42,
 		"properties": map[string]interface{}{
-			"components": []interface{}{},
+			"components": 42,
 		},
 	}
 	b, err := json.Marshal(body)
@@ -1139,36 +1155,19 @@ func Test_UpdateDeployment_Create_ValidationFailure(t *testing.T) {
 
 	test.handler.ServeHTTP(w, req)
 
-	require.Equal(t, 202, w.Code)
-	location := w.Result().Header.Get(textproto.CanonicalMIMEHeaderKey("Location"))
-	require.NotEmpty(t, location)
-
-	expected := &rest.Deployment{
-		ResourceBase: rest.ResourceBase{
-			ID:             deploymentID.ID,
-			SubscriptionID: deploymentID.SubscriptionID,
-			ResourceGroup:  deploymentID.ResourceGroup,
-			Name:           deploymentID.Name(),
-			Type:           deploymentID.Kind(),
-		},
-		Properties: rest.DeploymentProperties{
-			ProvisioningState: rest.DeployingStatus,
+	require.Equal(t, 400, w.Code)
+	expected := &armerrors.ErrorResponse{
+		Error: armerrors.ErrorDetails{
+			Code:    armerrors.Invalid,
+			Message: "Validation error",
+			Details: []armerrors.ErrorDetails{{
+				Message: "(root).name: Invalid type. Expected: string, given: integer",
+			}, {
+				Message: "(root).properties.components: Invalid type. Expected: array, given: integer",
+			}},
 		},
 	}
 	requireJSON(t, expected, w)
-
-	test.ValidateDeploymentOperationInProgress(location)
-
-	// Now unblock the completion of the deployment
-	complete <- struct{}{}
-
-	code, actual, armerr := test.PollForFailedOperation(deploymentID, location)
-	require.Equal(t, rest.FailedStatus, actual.Properties.ProvisioningState)
-
-	require.Equal(t, 400, code)
-	require.NotNil(t, armerr)
-	require.Equal(t, armerrors.CodeInvalid, armerr.Error.Code)
-	require.Equal(t, "deployment was invalid :(", armerr.Error.Message)
 }
 
 func Test_UpdateDeployment_Create_Failure(t *testing.T) {
@@ -1188,7 +1187,7 @@ func Test_UpdateDeployment_Create_Failure(t *testing.T) {
 			}
 		})
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	body := map[string]interface{}{
 		"properties": map[string]interface{}{
@@ -1232,7 +1231,7 @@ func Test_UpdateDeployment_Create_Failure(t *testing.T) {
 
 	require.Equal(t, 500, code)
 	require.NotNil(t, armerr)
-	require.Equal(t, armerrors.CodeInternal, armerr.Error.Code)
+	require.Equal(t, armerrors.Internal, armerr.Error.Code)
 	require.Equal(t, "deployment failed :(", armerr.Error.Message)
 }
 
@@ -1260,7 +1259,7 @@ func Test_UpdateDeployment_FailureCanBeRetried(t *testing.T) {
 			}
 		})
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	rev := test.DBCreateComponent(TestApplicationName, "A", "radius.dev/Test@v1alpha1", db.ComponentProperties{})
 
 	body := map[string]interface{}{
@@ -1316,7 +1315,7 @@ func Test_UpdateDeployment_FailureCanBeRetried(t *testing.T) {
 
 	require.Equal(t, 500, code)
 	require.NotNil(t, armerr)
-	require.Equal(t, armerrors.CodeInternal, armerr.Error.Code)
+	require.Equal(t, armerrors.Internal, armerr.Error.Code)
 	require.Equal(t, "deployment failed :(", armerr.Error.Message)
 
 	// Now retry and it should succeed
@@ -1359,7 +1358,7 @@ func Test_UpdateDeployment_UpdateSuccess(t *testing.T) {
 			}
 		})
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	test.DBCreateDeployment(TestApplicationName, "default", db.DeploymentProperties{})
 	rev := test.DBCreateComponent(TestApplicationName, "A", "radius.dev/Test@v1alpha1", db.ComponentProperties{})
 
@@ -1418,7 +1417,7 @@ func Test_UpdateDeployment_UpdateSuccess(t *testing.T) {
 func Test_UpdateDeployment_UpdateNoOp(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	test.DBCreateDeployment(TestApplicationName, "default", db.DeploymentProperties{})
 
 	body := map[string]interface{}{
@@ -1465,7 +1464,7 @@ func Test_DeleteDeployment_NoApplication(t *testing.T) {
 func Test_DeleteDeployment_NotFound(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	id := deploymentID(TestApplicationName, "default")
 	req := httptest.NewRequest("DELETE", id.ID, nil)
@@ -1493,7 +1492,7 @@ func Test_DeleteDeployment_Found_Success(t *testing.T) {
 			}
 		})
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	test.DBCreateDeployment(TestApplicationName, "default", db.DeploymentProperties{})
 
 	deploymentID := deploymentID(TestApplicationName, "default")
@@ -1549,7 +1548,7 @@ func Test_DeleteDeployment_Found_ValidationFailure(t *testing.T) {
 			}
 		})
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	test.DBCreateDeployment(TestApplicationName, "default", db.DeploymentProperties{})
 
 	deploymentID := deploymentID(TestApplicationName, "default")
@@ -1586,7 +1585,7 @@ func Test_DeleteDeployment_Found_ValidationFailure(t *testing.T) {
 
 	require.Equal(t, 400, code)
 	require.NotNil(t, armerr)
-	require.Equal(t, armerrors.CodeInvalid, armerr.Error.Code)
+	require.Equal(t, armerrors.Invalid, armerr.Error.Code)
 	require.Equal(t, "deletion was invalid :(", armerr.Error.Message)
 }
 
@@ -1607,7 +1606,7 @@ func Test_DeleteDeployment_Found_Failed(t *testing.T) {
 			}
 		})
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	test.DBCreateDeployment(TestApplicationName, "default", db.DeploymentProperties{})
 
 	deploymentID := deploymentID(TestApplicationName, "default")
@@ -1644,7 +1643,7 @@ func Test_DeleteDeployment_Found_Failed(t *testing.T) {
 
 	require.Equal(t, 500, code)
 	require.NotNil(t, armerr)
-	require.Equal(t, armerrors.CodeInternal, armerr.Error.Code)
+	require.Equal(t, armerrors.Internal, armerr.Error.Code)
 	require.Equal(t, "deletion failed :(", armerr.Error.Message)
 }
 
@@ -1661,6 +1660,7 @@ func Test_GetScope_NoApplication(t *testing.T) {
 
 	expected := &armerrors.ErrorResponse{
 		Error: armerrors.ErrorDetails{
+			Code:    armerrors.NotFound,
 			Target:  id.ID,
 			Message: fmt.Sprintf("the resource with id '%s' was not found", id.ID),
 		},
@@ -1671,7 +1671,7 @@ func Test_GetScope_NoApplication(t *testing.T) {
 func Test_GetScope_NotFound(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	id := scopeID(TestApplicationName, "scope1")
 	req := httptest.NewRequest("GET", id.ID, nil)
@@ -1683,6 +1683,7 @@ func Test_GetScope_NotFound(t *testing.T) {
 
 	expected := &armerrors.ErrorResponse{
 		Error: armerrors.ErrorDetails{
+			Code:    armerrors.NotFound,
 			Target:  id.ID,
 			Message: fmt.Sprintf("the resource with id '%s' was not found", id.ID),
 		},
@@ -1693,7 +1694,7 @@ func Test_GetScope_NotFound(t *testing.T) {
 func Test_GetScope_Found(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	test.DBCreateScope(TestApplicationName, "scope1", nil)
 
 	scopeID := scopeID(TestApplicationName, "scope1")
@@ -1732,6 +1733,7 @@ func Test_ListScopes_NoApplication(t *testing.T) {
 
 	expected := &armerrors.ErrorResponse{
 		Error: armerrors.ErrorDetails{
+			Code:    armerrors.NotFound,
 			Target:  a.ID,
 			Message: fmt.Sprintf("the resource with id '%s' was not found", a.ID),
 		},
@@ -1742,7 +1744,7 @@ func Test_ListScopes_NoApplication(t *testing.T) {
 func Test_ListScopes_Empty(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	id := scopeList(TestApplicationName)
 	req := httptest.NewRequest("GET", id.ID, nil)
@@ -1759,7 +1761,7 @@ func Test_ListScopes_Empty(t *testing.T) {
 func Test_ListScopes_Found(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	test.DBCreateScope(TestApplicationName, "scope1", nil)
 
 	req := httptest.NewRequest("GET", scopeList(TestApplicationName).ID, nil)
@@ -1807,6 +1809,7 @@ func Test_UpdateScopes_NoApplication(t *testing.T) {
 
 	expected := &armerrors.ErrorResponse{
 		Error: armerrors.ErrorDetails{
+			Code:    armerrors.NotFound,
 			Target:  a.ID,
 			Message: fmt.Sprintf("the resource with id '%s' was not found", a.ID),
 		},
@@ -1817,7 +1820,7 @@ func Test_UpdateScopes_NoApplication(t *testing.T) {
 func Test_UpdateScopes_Create(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	body := map[string]interface{}{
 		"kind":       "radius.dev/Test@v1alpha1",
@@ -1850,7 +1853,7 @@ func Test_UpdateScopes_Create(t *testing.T) {
 func Test_UpdateScopes_UpdateNoOp(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	test.DBCreateScope(TestApplicationName, "scope1", nil)
 
 	body := map[string]interface{}{
@@ -1883,7 +1886,7 @@ func Test_UpdateScopes_UpdateNoOp(t *testing.T) {
 func Test_UpdateScopes_Update(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	test.DBCreateScope(TestApplicationName, "scope1", nil)
 
 	body := map[string]interface{}{
@@ -1928,7 +1931,7 @@ func Test_DeleteScope_NoApplication(t *testing.T) {
 func Test_DeleteScope_NotFound(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 
 	id := scopeID(TestApplicationName, "scope1")
 	req := httptest.NewRequest("DELETE", id.ID, nil)
@@ -1942,7 +1945,7 @@ func Test_DeleteScope_NotFound(t *testing.T) {
 func Test_DeleteScope_Found(t *testing.T) {
 	test := start(t)
 
-	test.DBCreateApplication(TestApplicationName, nil)
+	test.DBCreateApplication(TestApplicationName, db.ApplicationProperties{})
 	test.DBCreateScope(TestApplicationName, "scope1", nil)
 
 	id := scopeID(TestApplicationName, "scope1")
