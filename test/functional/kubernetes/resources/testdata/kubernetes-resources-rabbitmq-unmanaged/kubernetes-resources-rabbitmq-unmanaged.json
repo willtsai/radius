@@ -1,0 +1,58 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.4.1126.7861",
+      "templateHash": "2509925870928143"
+    }
+  },
+  "imports": {
+    "kubernetes": {
+      "provider": "Kubernetes",
+      "version": "0.1"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.CustomProviders/resourceProviders/Application/ContainerComponent",
+      "apiVersion": "2018-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', 'radiusv3', 'kubernetes-resources-rabbitmq-unmanaged', 'todoapp')]",
+      "properties": {
+        "container": {
+          "image": "radius.azurecr.io/magpie:latest"
+        },
+        "connections": {
+          "rabbitmq": {
+            "kind": "rabbitmq.com/MessageQueue",
+            "source": "[resourceId('Microsoft.CustomProviders/resourceProviders/Application/rabbitmq.com.MessageQueueComponent', 'radiusv3', 'kubernetes-resources-rabbitmq-unmanaged', 'rabbitmq')]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CustomProviders/resourceProviders/Application', 'radiusv3', 'kubernetes-resources-rabbitmq-unmanaged')]",
+        "[resourceId('Microsoft.CustomProviders/resourceProviders/Application/rabbitmq.com.MessageQueueComponent', 'radiusv3', 'kubernetes-resources-rabbitmq-unmanaged', 'rabbitmq')]"
+      ]
+    },
+    {
+      "type": "Microsoft.CustomProviders/resourceProviders/Application/rabbitmq.com.MessageQueueComponent",
+      "apiVersion": "2018-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', 'radiusv3', 'kubernetes-resources-rabbitmq-unmanaged', 'rabbitmq')]",
+      "properties": {
+        "queue": "queue",
+        "secrets": {
+          "connectionString": "[format('amqp://admin:{0}@{1}.{2}.svc.cluster.local:{3}', base64ToString(reference(resourceId('kubernetes.core/Secret', 'rabbitmq-pw'), 'v1', 'full').properties.data['rabbitmq-password']), reference(resourceId('kubernetes.core/Service', 'rabbitmq-svc'), 'v1', 'full').properties.metadata.name, reference(resourceId('kubernetes.core/Service', 'rabbitmq-svc'), 'v1', 'full').properties.metadata.namespace, reference(resourceId('kubernetes.core/Service', 'rabbitmq-svc'), 'v1', 'full').properties.spec.ports[0].port)]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CustomProviders/resourceProviders/Application', 'radiusv3', 'kubernetes-resources-rabbitmq-unmanaged')]"
+      ]
+    },
+    {
+      "type": "Microsoft.CustomProviders/resourceProviders/Application",
+      "apiVersion": "2018-09-01-preview",
+      "name": "[format('{0}/{1}', 'radiusv3', 'kubernetes-resources-rabbitmq-unmanaged')]"
+    }
+  ]
+}

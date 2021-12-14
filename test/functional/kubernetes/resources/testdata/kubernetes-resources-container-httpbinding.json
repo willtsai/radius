@@ -1,0 +1,98 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.4.1126.7861",
+      "templateHash": "4109747718437211931"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.CustomProviders/resourceProviders/Application/HttpRoute",
+      "apiVersion": "2018-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', 'radiusv3', 'kubernetes-resources-container-httpbinding', 'frontend')]",
+      "properties": {
+        "port": 80,
+        "gateway": {
+          "hostname": "*"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CustomProviders/resourceProviders/Application', 'radiusv3', 'kubernetes-resources-container-httpbinding')]"
+      ]
+    },
+    {
+      "type": "Microsoft.CustomProviders/resourceProviders/Application/ContainerComponent",
+      "apiVersion": "2018-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', 'radiusv3', 'kubernetes-resources-container-httpbinding', 'frontend')]",
+      "properties": {
+        "connections": {
+          "backend": {
+            "kind": "Http",
+            "source": "[resourceId('Microsoft.CustomProviders/resourceProviders/Application/HttpRoute', 'radiusv3', 'kubernetes-resources-container-httpbinding', 'backend')]"
+          }
+        },
+        "container": {
+          "image": "rynowak/frontend:0.5.0-dev",
+          "ports": {
+            "web": {
+              "containerPort": 80,
+              "provides": "[resourceId('Microsoft.CustomProviders/resourceProviders/Application/HttpRoute', 'radiusv3', 'kubernetes-resources-container-httpbinding', 'frontend')]"
+            }
+          },
+          "env": {
+            "SERVICE__BACKEND__HOST": "[reference(resourceId('Microsoft.CustomProviders/resourceProviders/Application/HttpRoute', 'radiusv3', 'kubernetes-resources-container-httpbinding', 'backend')).host]",
+            "SERVICE__BACKEND__PORT": "[format('{0}', reference(resourceId('Microsoft.CustomProviders/resourceProviders/Application/HttpRoute', 'radiusv3', 'kubernetes-resources-container-httpbinding', 'backend')).port)]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CustomProviders/resourceProviders/Application', 'radiusv3', 'kubernetes-resources-container-httpbinding')]",
+        "[resourceId('Microsoft.CustomProviders/resourceProviders/Application/HttpRoute', 'radiusv3', 'kubernetes-resources-container-httpbinding', 'backend')]",
+        "[resourceId('Microsoft.CustomProviders/resourceProviders/Application/HttpRoute', 'radiusv3', 'kubernetes-resources-container-httpbinding', 'frontend')]"
+      ]
+    },
+    {
+      "type": "Microsoft.CustomProviders/resourceProviders/Application/HttpRoute",
+      "apiVersion": "2018-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', 'radiusv3', 'kubernetes-resources-container-httpbinding', 'backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.CustomProviders/resourceProviders/Application', 'radiusv3', 'kubernetes-resources-container-httpbinding')]"
+      ]
+    },
+    {
+      "type": "Microsoft.CustomProviders/resourceProviders/Application/ContainerComponent",
+      "apiVersion": "2018-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', 'radiusv3', 'kubernetes-resources-container-httpbinding', 'backend')]",
+      "properties": {
+        "container": {
+          "image": "rynowak/backend:0.5.0-dev",
+          "ports": {
+            "web": {
+              "containerPort": 80,
+              "provides": "[resourceId('Microsoft.CustomProviders/resourceProviders/Application/HttpRoute', 'radiusv3', 'kubernetes-resources-container-httpbinding', 'backend')]"
+            }
+          },
+          "volumes": {
+            "my-volume": {
+              "kind": "ephemeral",
+              "mountPath": "/tmpfs",
+              "managedStore": "memory"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CustomProviders/resourceProviders/Application', 'radiusv3', 'kubernetes-resources-container-httpbinding')]",
+        "[resourceId('Microsoft.CustomProviders/resourceProviders/Application/HttpRoute', 'radiusv3', 'kubernetes-resources-container-httpbinding', 'backend')]"
+      ]
+    },
+    {
+      "type": "Microsoft.CustomProviders/resourceProviders/Application",
+      "apiVersion": "2018-09-01-preview",
+      "name": "[format('{0}/{1}', 'radiusv3', 'kubernetes-resources-container-httpbinding')]"
+    }
+  ]
+}
