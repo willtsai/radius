@@ -12,6 +12,7 @@ using Azure.Deployments.Core.Extensions;
 using Azure.Deployments.Templates.Extensions;
 using Azure.Deployments.Core.Entities;
 using System.Net.Http.Formatting;
+using System.Text.Json;
 
 namespace DeploymentEngine.Controllers;
 
@@ -41,10 +42,11 @@ public class DeploymentController : ControllerBase
     }
 
     [HttpPost(Name = "PostDeployment")]
-    public async Task Post(string deploymentPayload)
+    public async Task Post([FromBody] JsonElement content)
     {
+        string json = System.Text.Json.JsonSerializer.Serialize(content);
 
-        var httpContent = new StringContent(deploymentPayload, Encoding.UTF8, "application/json");
+        var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Deserialize deployment http request payload into a DeploymentContent object.
         var deploymentContent = await GetDeploymentContentAndTryCalculateHash(httpContent);
@@ -79,7 +81,7 @@ public class DeploymentController : ControllerBase
             apiVersion: DeploymentApiVersion,
             metadata: templateMetadata);
 
-        var dependencyProvider = new DependencyProcessor(DeploymentApiVersion, null);
+        var dependencyProvider = new DependencyProcessor(DeploymentApiVersion, new TempEventSource());
 
         // Calculate predecessor/successor dependencies.
         var dependencies = dependencyProvider.GetDeploymentDependencies(
@@ -141,12 +143,12 @@ public class DeploymentController : ControllerBase
     /// <returns>The requested deployment definition.</returns>
     private static async Task<DeploymentContent> GetDeploymentContentAndTryCalculateHash(HttpContent httpContent)
     {
+        var deploymentContent = await ReadAsJsonAsyncWithRewind<DeploymentContent>(httpContent)
+            .ConfigureAwait(continueOnCapturedContext: false);
 
-        var deploymentContent = new DeploymentContent();
         deploymentContent.Properties.TemplateHash = deploymentContent.Properties.Template != null
             ? TemplateHelpers.ComputeTemplateHash(deploymentContent.Properties.Template.ToJToken())
             : null;
-        // this is a test of my connection speed aasdf
 
         return deploymentContent;
     }
