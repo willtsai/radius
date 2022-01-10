@@ -13,6 +13,9 @@ using Azure.Deployments.Templates.Extensions;
 using Azure.Deployments.Core.Entities;
 using System.Net.Http.Formatting;
 using System.Text.Json;
+using Microsoft.WindowsAzure.ResourceStack.Common.BackgroundJobs;
+using Microsoft.WindowsAzure.ResourceStack.Common.Storage.Volatile;
+using Microsoft.WindowsAzure.ResourceStack.Common.EventSources;
 
 namespace DeploymentEngine.Controllers;
 
@@ -20,25 +23,20 @@ namespace DeploymentEngine.Controllers;
 [Route("[controller]")]
 public class DeploymentController : ControllerBase
 {
-    private const string GuidFunctionEvaluationResultOverwrites = "6ae62a0e-7f70-445d-b3e0-8adf273fda31";
-
-    private const string TenantId = "be07e532-cc1d-4a62-8543-b2ed399fb8c4";
-
-    private const string SubscriptionId = "c105bc0f-ed77-493b-b9e1-1b78d672a578";
-
-    private const string ResourceGroupName = "testRg";
-
-    private const string ResourceGroupLocation = "DevBox";
-
-    private const string DeploymentName = "testDeployment";
-
     private const string DeploymentApiVersion = "2020-10-01";
 
     private readonly ILogger<DeploymentController> _logger;
 
-    public DeploymentController(ILogger<DeploymentController> logger)
+    private readonly JobDispatcherClient jobDispatcherClient;
+
+    public JobManagementClient JobManagementClient => this.jobDispatcherClient.JobManagement;
+
+    public DeploymentController(ILogger<DeploymentController> logger, string location, JobCallbackFactory callbackFactory, IBackgroundJobsEventSource eventSource, string secretThumbprint)
     {
         _logger = logger;
+        jobDispatcherClient = new JobDispatcherClient(memoryStorage: new VolatileMemoryStorage(), executionAffinity: location, eventSource: eventSource, factory: callbackFactory, secretThumbprint: secretThumbprint);
+
+        jobDispatcherClient.RegisterJobCallbackAssembly(typeof(DeploymentController).Assembly);
     }
 
     [HttpPost(Name = "PostDeployment")]
@@ -46,6 +44,10 @@ public class DeploymentController : ControllerBase
     {
         string json = System.Text.Json.JsonSerializer.Serialize(content);
 
+        // Code is copied from arm, no functionality change
+        // Anthoney Uploaded extensibility package on nuget. Azure.Deployments.Extensibility
+        // Ask anothony about how to determine which rp to contact with extensibility
+        // Really talk to anthony about this.
         var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Deserialize deployment http request payload into a DeploymentContent object.
@@ -55,11 +57,25 @@ public class DeploymentController : ControllerBase
                     { "newGuid", GuidFunctionEvaluationResultOverwrites }
                 };
 
+
+        await ProcessDeployment(deploymentContent, overwrites);
+    }
+
+    private async Task ProcessDeployment(DeploymentContent deploymentContent, InsensitiveDictionary<JToken> overwrites)
+    {
+        // Validation here
+
+        // PrepareDeploymentDefinition
+
+        // PopulateDeploymentMetadata
+
+        //PrepareParametersForDeployment
+
         var inputParameters = deploymentContent.Properties.Parameters is null
-            ? new InsensitiveDictionary<DeploymentParameterDefinition>()
-            : deploymentContent.Properties.Parameters.ToInsensitiveDictionary(
-                keySelector: parameterKvp => parameterKvp.Key,
-                elementSelector: parameterKvp => parameterKvp.Value);
+    ? new InsensitiveDictionary<DeploymentParameterDefinition>()
+    : deploymentContent.Properties.Parameters.ToInsensitiveDictionary(
+        keySelector: parameterKvp => parameterKvp.Key,
+        elementSelector: parameterKvp => parameterKvp.Value);
 
         // Evaluate template language expressions (excluding those runtime functions)
         // and perform static (as compared to RP resource validation) validations.
@@ -73,13 +89,44 @@ public class DeploymentController : ControllerBase
 
         var templateMetadata = TemplateMetadata.Build(deploymentContent.Properties.Template);
 
+        //var deploymentLocation = DeploymentEngine.GetDeploymentLocation(resourceGroupLocation: deploymentContext.ResourceGroupLocation, definition: definition);
+
+    //    var oldDeploymentMapping = await this
+    //.GetOldDeploymentMapping(
+    //    deploymentContext: deploymentContext,
+    //    deploymentDefinition: definition,
+    //    deploymentName: deploymentContext.DeploymentName)
+    //.ConfigureAwait(continueOnCapturedContext: false);
+
+    //    var oldDeployment = await this
+    //        .ProcessOldDeployment(
+    //            deploymentContext: deploymentContext,
+    //            deploymentDefinition: definition,
+    //            deploymentLocation: deploymentLocation,
+    //            frontdoorEndpoint: request.GetFrontdoorEndpoint().Uri,
+    //            oldDeploymentMapping: oldDeploymentMapping)
+    //        .ConfigureAwait(continueOnCapturedContext: false);
+
         // Populate deployment resources from template.Resources.
         var deploymentResources = await DeploymentUtils.GetDeploymentResources(
-            managementGroupId: null,
+            managementGroupId: null, // TODO fill this in
             subscriptionId: SubscriptionId,
             resourceGroupName: ResourceGroupName,
             apiVersion: DeploymentApiVersion,
             metadata: templateMetadata);
+
+        // ExtensibleResources
+
+        // preflight validation
+        //                if (validatePreflightResources)
+        //{
+        //    await this.deploymentEngineHost.PerformStaticResourceValidation(
+        //                subscriptionId: deploymentContext.SubscriptionId,
+        //                resourceGroupName: deploymentContext.ResourceGroupName,
+        //                deploymentResources: deploymentResources)
+        //        .ConfigureAwait(continueOnCapturedContext: false);
+        //}
+
 
         var dependencyProvider = new DependencyProcessor(DeploymentApiVersion, new TempEventSource());
 
@@ -91,6 +138,39 @@ public class DeploymentController : ControllerBase
             metadata: templateMetadata,
             deploymentResources: deploymentResources,
             extensibleResources: new Dictionary<string, ExtensibleResource>());
+
+
+        // Before worker job, preflight
+        // Kind of like whatif, failfast, send resource definition to RPs, RP will validate payload as much as possible.
+        // 
+
+        // Create a sequencer job with these dependencies and resources,
+        // Sequencer job could either be extensible OR same one with different endpoint
+        // When resource stack package is created, start to use it and create the deployment job here.
+
+    }
+
+    public async Task<SequencerBuilder> CreateNewDeploymentJob()
+    {
+        var deploymentJob = CreateDeploymentSequencer();
+
+        // For now, let's do a single action in the sequence.
+        deploymentJob.WithAction("ID", "DeploymentResourceJob", "METADATA");
+
+        // TODO for now, let's do linear
+        await this.JobManagementClient.CreateSequencer(SequencerType.Linear, deploymentJob);
+    }
+
+    private SequencerBuilder CreateDeploymentSequencer()
+    {
+        //var deploymentSequencerPartition = DeploymentJobMetadata.GetSequencerPartition(deployment: deployment);
+        //             var deploymentSequencerId = DeploymentJobMetadata.GetSequencerId(deployment: deployment);
+
+        // What is a partition: even spread across sequencer jobs, can use subscriptionId + resourcegroupname maybe?
+        // ID is just an id
+        var deploymentJob = SequencerBuilder.Create("test", "SOMEID");
+
+
     }
 
 
