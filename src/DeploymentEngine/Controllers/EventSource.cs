@@ -1,9 +1,8 @@
-﻿using System;
-using Azure.Deployments.Core.EventSources;
+﻿using Azure.Deployments.Core.EventSources;
 
 namespace DeploymentEngine.Controllers
 {
-    public class TempEventSource : IGeneralEventSource
+    public class EventSource : IGeneralEventSource
     {
         public void Critical(string operationName, string message, Exception exception = null)
         {

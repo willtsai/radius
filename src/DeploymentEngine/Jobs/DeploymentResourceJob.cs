@@ -1,4 +1,5 @@
 ﻿using Microsoft.WindowsAzure.ResourceStack.Common.BackgroundJobs;
+using Newtonsoft.Json.Linq;
 
 namespace DeploymentEngine.Jobs
 {
@@ -15,12 +16,21 @@ namespace DeploymentEngine.Jobs
             return base.OnConfigure();
         }
 
-        protected override Task<JobExecutionResult> OnExecute()
+        protected override async Task<JobExecutionResult> OnExecute()
         {
             // TODO create radius resource for deployment
             // OR call RP contract on update resource.
             // Would love some sort of way to poll better here for deployment.
-            throw new NotImplementedException();
+            Metadata = JToken.Parse(this.BackgroundJob.Metadata).ToObject<JobMetadata>();
+
+            // TODO do async stuff here.
+            await Task.CompletedTask;
+
+            return new JobExecutionResult()
+            {
+                Status = JobExecutionStatus.Succeeded,
+                Message = ""
+            };
         }
     }
 }

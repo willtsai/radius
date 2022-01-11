@@ -16,6 +16,8 @@ using System.Text.Json;
 using Microsoft.WindowsAzure.ResourceStack.Common.BackgroundJobs;
 using Microsoft.WindowsAzure.ResourceStack.Common.Storage.Volatile;
 using Microsoft.WindowsAzure.ResourceStack.Common.EventSources;
+using Microsoft.WindowsAzure.ResourceStack.Common.Collections;
+using DeploymentEngine.Jobs;
 
 namespace DeploymentEngine.Controllers;
 
@@ -23,24 +25,17 @@ namespace DeploymentEngine.Controllers;
 [Route("[controller]")]
 public class DeploymentController : ControllerBase
 {
-    private const string DeploymentApiVersion = "2020-10-01";
-
     private readonly ILogger<DeploymentController> _logger;
 
-    private readonly JobDispatcherClient jobDispatcherClient;
-
-    public JobManagementClient JobManagementClient => this.jobDispatcherClient.JobManagement;
-
-    public DeploymentController(ILogger<DeploymentController> logger, string location, JobCallbackFactory callbackFactory, IBackgroundJobsEventSource eventSource, string secretThumbprint)
+    public DeploymentController(ILogger<DeploymentController> logger)
     {
         _logger = logger;
-        jobDispatcherClient = new JobDispatcherClient(memoryStorage: new VolatileMemoryStorage(), executionAffinity: location, eventSource: eventSource, factory: callbackFactory, secretThumbprint: secretThumbprint);
-
-        jobDispatcherClient.RegisterJobCallbackAssembly(typeof(DeploymentController).Assembly);
     }
 
-    [HttpPost(Name = "PostDeployment")]
-    public async Task Post([FromBody] JsonElement content)
+    // TODO tenant, subscription, management group
+    // Default to subscription
+    [HttpPut(Name = "PutDeployment")]
+    public async Task<ContentResult> PutDeployment([FromBody] JsonElement content, string subscriptionId, string resourceGroupName, string deploymentName, CancellationToken cancellationToken)
     {
         string json = System.Text.Json.JsonSerializer.Serialize(content);
 
@@ -53,15 +48,34 @@ public class DeploymentController : ControllerBase
         // Deserialize deployment http request payload into a DeploymentContent object.
         var deploymentContent = await GetDeploymentContentAndTryCalculateHash(httpContent);
         // Overwrite newGuid() template function result in order to compare against pre-recorded baseline result.
-        var overwrites = new InsensitiveDictionary<JToken>() {
-                    { "newGuid", GuidFunctionEvaluationResultOverwrites }
+        var overwrites = new InsensitiveConcurrentDictionary<JToken>() {
                 };
 
-
-        await ProcessDeployment(deploymentContent, overwrites);
+        return await ProcessResourceGroupDeploymentRequest(subscriptionId, resourceGroupName, deploymentName, deploymentContent, overwrites, cancellationToken);
     }
 
-    private async Task ProcessDeployment(DeploymentContent deploymentContent, InsensitiveDictionary<JToken> overwrites)
+    private async Task<ContentResult> ProcessResourceGroupDeploymentRequest(
+        string subscriptionId,
+        string resourceGroupName,
+        string deploymentName, 
+        DeploymentContent definition,
+        InsensitiveConcurrentDictionary<JToken> deploymentResourceGroups,
+        CancellationToken cancellationToken)
+    {
+        // Get ResourceGroup
+        // Get Subscription
+        // tenant?
+        // Create deploymentContext, just a context object
+        var deploymentContext = DeploymentRequestContext.CreateAtResourceGroup(
+            tenantId: "temp", // TODO what is tenantId?
+            subscriptionId: subscriptionId,
+            resourceGroupName: resourceGroupName,
+            deploymentName: deploymentName);
+
+        return await ProcessDeploymentRequest(deploymentContext, definition, deploymentResourceGroups, cancellationToken);
+    }
+
+    private async Task<ContentResult> ProcessDeploymentRequest(DeploymentRequestContext context, DeploymentContent deploymentContent, InsensitiveConcurrentDictionary<JToken> overwrites, CancellationToken cancellationToken)
     {
         // Validation here
 
@@ -70,109 +84,29 @@ public class DeploymentController : ControllerBase
         // PopulateDeploymentMetadata
 
         //PrepareParametersForDeployment
+        var deploymentEngine = new DeploymentEngine.Jobs.DeploymentEngine(location: "test", callbackFactory: new DeploymentJobCallbackFactory(new JobConfiguration()), new BackgroundEventSource());
 
-        var inputParameters = deploymentContent.Properties.Parameters is null
-    ? new InsensitiveDictionary<DeploymentParameterDefinition>()
-    : deploymentContent.Properties.Parameters.ToInsensitiveDictionary(
-        keySelector: parameterKvp => parameterKvp.Key,
-        elementSelector: parameterKvp => parameterKvp.Value);
+        var deploymentState = await deploymentEngine.ProcessDeployment(context, deploymentContent, cancellationToken);
 
-        // Evaluate template language expressions (excluding those runtime functions)
-        // and perform static (as compared to RP resource validation) validations.
-        DeploymentUtils.PrepareTemplateForDeployment(
-            deploymentContent: deploymentContent,
-            template: deploymentContent.Properties.Template,
-            deploymentParameters: inputParameters,
-            metadata: this.GetDeploymentMetadata(deploymentContent),
-            apiVersion: DeploymentApiVersion,
-            functionEvaluationOverwrites: overwrites);
-
-        var templateMetadata = TemplateMetadata.Build(deploymentContent.Properties.Template);
-
-        //var deploymentLocation = DeploymentEngine.GetDeploymentLocation(resourceGroupLocation: deploymentContext.ResourceGroupLocation, definition: definition);
-
-    //    var oldDeploymentMapping = await this
-    //.GetOldDeploymentMapping(
-    //    deploymentContext: deploymentContext,
-    //    deploymentDefinition: definition,
-    //    deploymentName: deploymentContext.DeploymentName)
-    //.ConfigureAwait(continueOnCapturedContext: false);
-
-    //    var oldDeployment = await this
-    //        .ProcessOldDeployment(
-    //            deploymentContext: deploymentContext,
-    //            deploymentDefinition: definition,
-    //            deploymentLocation: deploymentLocation,
-    //            frontdoorEndpoint: request.GetFrontdoorEndpoint().Uri,
-    //            oldDeploymentMapping: oldDeploymentMapping)
-    //        .ConfigureAwait(continueOnCapturedContext: false);
-
-        // Populate deployment resources from template.Resources.
-        var deploymentResources = await DeploymentUtils.GetDeploymentResources(
-            managementGroupId: null, // TODO fill this in
-            subscriptionId: SubscriptionId,
-            resourceGroupName: ResourceGroupName,
-            apiVersion: DeploymentApiVersion,
-            metadata: templateMetadata);
-
-        // ExtensibleResources
-
-        // preflight validation
-        //                if (validatePreflightResources)
-        //{
-        //    await this.deploymentEngineHost.PerformStaticResourceValidation(
-        //                subscriptionId: deploymentContext.SubscriptionId,
-        //                resourceGroupName: deploymentContext.ResourceGroupName,
-        //                deploymentResources: deploymentResources)
-        //        .ConfigureAwait(continueOnCapturedContext: false);
-        //}
-
-
-        var dependencyProvider = new DependencyProcessor(DeploymentApiVersion, new TempEventSource());
-
-        // Calculate predecessor/successor dependencies.
-        var dependencies = dependencyProvider.GetDeploymentDependencies(
-            managementGroupId: null,
-            subscriptionId: SubscriptionId,
-            resourceGroupName: ResourceGroupName,
-            metadata: templateMetadata,
-            deploymentResources: deploymentResources,
-            extensibleResources: new Dictionary<string, ExtensibleResource>());
-
-
-        // Before worker job, preflight
-        // Kind of like whatif, failfast, send resource definition to RPs, RP will validate payload as much as possible.
-        // 
-
-        // Create a sequencer job with these dependencies and resources,
-        // Sequencer job could either be extensible OR same one with different endpoint
-        // When resource stack package is created, start to use it and create the deployment job here.
-
+        return await this.StartDeployment(deploymentState);
     }
 
-    public async Task<SequencerBuilder> CreateNewDeploymentJob()
+    private async Task<ContentResult> StartDeployment(DeploymentState deploymentState)
     {
-        var deploymentJob = CreateDeploymentSequencer();
-
-        // For now, let's do a single action in the sequence.
-        deploymentJob.WithAction("ID", "DeploymentResourceJob", "METADATA");
-
-        // TODO for now, let's do linear
-        await this.JobManagementClient.CreateSequencer(SequencerType.Linear, deploymentJob);
+        //await this
+        //    .GetJobsDataProvider(location: deploymentState.DeploymentLocation)
+        //    .CreateDeploymentJob(
+        //        deploymentJob: deploymentState.DeploymentJob,
+        //        onCommitJobDefinitionDelegate: () => this.SaveDeploymentAndMapping(deploymentState))
+        //    .ConfigureAwait(continueOnCapturedContext: false);
+        return this.CreateAsyncResponse();
     }
 
-    private SequencerBuilder CreateDeploymentSequencer()
+    private ContentResult CreateAsyncResponse()
     {
-        //var deploymentSequencerPartition = DeploymentJobMetadata.GetSequencerPartition(deployment: deployment);
-        //             var deploymentSequencerId = DeploymentJobMetadata.GetSequencerId(deployment: deployment);
-
-        // What is a partition: even spread across sequencer jobs, can use subscriptionId + resourcegroupname maybe?
-        // ID is just an id
-        var deploymentJob = SequencerBuilder.Create("test", "SOMEID");
-
-
+        // TODO make async response
+        return new ContentResult();
     }
-
 
     /// <summary>
     /// A helper class for comparing dependencies.
@@ -261,28 +195,28 @@ public class DeploymentController : ControllerBase
     /// It's up to the deployment engine host, such as ARM frontdoor or deployment micro-service, to populate
     /// the metadata and provide it to deployment engine.
     /// </summary>
-    private DeploymentMetadata GetDeploymentMetadata(DeploymentContent deploymentContent)
-    {
-        var metadata = new DeploymentMetadata();
+    //private DeploymentMetadata GetDeploymentMetadata(DeploymentContent deploymentContent)
+    //{
+    //    var metadata = new DeploymentMetadata();
 
-        metadata["name"] = DeploymentName;
-        metadata[DeploymentMetadata.DeploymentKey] = deploymentContent.ToJToken();
+    //    metadata["name"] = DeploymentName;
+    //    metadata[DeploymentMetadata.DeploymentKey] = deploymentContent.ToJToken();
 
-        var testRgDefinition = new Dictionary<string, string> {
-                { "subscriptionId", SubscriptionId },
-                { "id", $"/subscriptions/{SubscriptionId}/resourceGroups/{ResourceGroupName}"},
-                { "name", ResourceGroupName },
-                { "location", ResourceGroupLocation } };
+    //    var testRgDefinition = new Dictionary<string, string> {
+    //            { "subscriptionId", SubscriptionId },
+    //            { "id", $"/subscriptions/{SubscriptionId}/resourceGroups/{ResourceGroupName}"},
+    //            { "name", ResourceGroupName },
+    //            { "location", ResourceGroupLocation } };
 
-        metadata[DeploymentMetadata.ResourceGroupKey] = JObject.FromObject(testRgDefinition);
+    //    metadata[DeploymentMetadata.ResourceGroupKey] = JObject.FromObject(testRgDefinition);
 
-        var testSubscriptionDefinition = new Dictionary<string, string> {
-                { "tenantId", TenantId},
-                { "subscriptionId", SubscriptionId },
-                { "id", $"/subscriptions/{SubscriptionId}"},
-                { "displayName", "Test Subscription" } };
-        metadata[DeploymentMetadata.SubscriptionKey] = JObject.FromObject(testSubscriptionDefinition);
+    //    var testSubscriptionDefinition = new Dictionary<string, string> {
+    //            { "tenantId", TenantId},
+    //            { "subscriptionId", SubscriptionId },
+    //            { "id", $"/subscriptions/{SubscriptionId}"},
+    //            { "displayName", "Test Subscription" } };
+    //    metadata[DeploymentMetadata.SubscriptionKey] = JObject.FromObject(testSubscriptionDefinition);
 
-        return metadata;
-    }
+    //    return metadata;
+    //}
 }
