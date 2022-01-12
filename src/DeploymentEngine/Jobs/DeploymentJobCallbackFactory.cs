@@ -25,7 +25,7 @@ namespace DeploymentEngine.Jobs
 
         private bool ShouldCreateJob(Type callbackType)
         {
-            if (typeof(JobBase<JobMetadata>).IsAssignableFrom(callbackType))
+            if (typeof(JobBase<DeploymentResourceJobMetadata>).IsAssignableFrom(callbackType))
             {
                 return true;
             }

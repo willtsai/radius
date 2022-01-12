@@ -4,7 +4,7 @@ using Newtonsoft.Json.Linq;
 namespace DeploymentEngine.Jobs
 {
     [JobCallback(Name = "DeploymentResourceJob")]
-    public class DeploymentResourceJob : JobBase<JobMetadata>
+    public class DeploymentResourceJob : JobBase<DeploymentResourceJobMetadata>
     {
         public DeploymentResourceJob(JobConfiguration configuration) :
             base(configuration)
@@ -21,7 +21,7 @@ namespace DeploymentEngine.Jobs
             // TODO create radius resource for deployment
             // OR call RP contract on update resource.
             // Would love some sort of way to poll better here for deployment.
-            Metadata = JToken.Parse(this.BackgroundJob.Metadata).ToObject<JobMetadata>();
+            Metadata = JToken.Parse(this.BackgroundJob.Metadata).ToObject<DeploymentResourceJobMetadata>();
 
             // TODO do async stuff here.
             await Task.CompletedTask;
