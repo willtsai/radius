@@ -7,7 +7,7 @@ using Newtonsoft.Json;
 
 namespace DeploymentEngine.Jobs
 {
-    public class DeploymentJobMetadata
+    public class DeploymentJobMetadata : FrontdoorJobMetadata
     {
         /// <summary>
         /// The sequencer job id storage key limit.
