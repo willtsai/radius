@@ -270,82 +270,82 @@ namespace DeploymentEngine.Jobs
             }
         }
 
-        /// <summary>
-        /// Processes the resource language expressions.
-        /// </summary>
-        /// <param name="deployment">The deployment.</param>
-        /// <param name="resource">The deployment resource.</param>
-        private async Task ProcessResourceLanguageExpressions(IDeploymentEntity deployment, DeploymentResource resource)
-        {
-            if (this.Metadata.AreTemplateExpressionsEvaluated.HasValue &&
-                this.Metadata.AreTemplateExpressionsEvaluated.Value)
-            {
-                return;
-            }
+        ///// <summary>
+        ///// Processes the resource language expressions.
+        ///// </summary>
+        ///// <param name="deployment">The deployment.</param>
+        ///// <param name="resource">The deployment resource.</param>
+        //private async Task ProcessResourceLanguageExpressions(IDeploymentEntity deployment, DeploymentResource resource)
+        //{
+        //    if (this.Metadata.AreTemplateExpressionsEvaluated.HasValue &&
+        //        this.Metadata.AreTemplateExpressionsEvaluated.Value)
+        //    {
+        //        return;
+        //    }
 
-            try
-            {
-                //if (resource.Properties != null)
-                //{
-                //    var references = await FetchResourcesFromSequencerActions(deployment, resource.References).ConfigureAwait(false);
+        //    try
+        //    {
+        //        //if (resource.Properties != null)
+        //        //{
+        //        //    var references = await FetchResourcesFromSequencerActions(deployment, resource.References).ConfigureAwait(false);
 
-                //    var sequencerActions = await this
-                //        .GetDeploymentSequencerActions(deployment)
-                //        .ConfigureAwait(continueOnCapturedContext: false);
+        //        //    var sequencerActions = await this
+        //        //        .GetDeploymentSequencerActions(deployment)
+        //        //        .ConfigureAwait(continueOnCapturedContext: false);
 
-                //    var evaluationContext = this.GetTemplateExpressionEvaluationContext(
-                //        deployment: deployment,
-                //        referenceValueLookup: references,
-                //        copyContext: resource.CopyContext,
-                //        sequencerActions: sequencerActions,
-                //        hasSymbolicName: !string.IsNullOrWhiteSpace(resource.SymbolicName));
+        //        //    var evaluationContext = this.GetTemplateExpressionEvaluationContext(
+        //        //        deployment: deployment,
+        //        //        referenceValueLookup: references,
+        //        //        copyContext: resource.CopyContext,
+        //        //        sequencerActions: sequencerActions,
+        //        //        hasSymbolicName: !string.IsNullOrWhiteSpace(resource.SymbolicName));
 
-                //    resource.Properties = ExpressionsEngine.EvaluateLanguageExpressionsRecursive(
-                //        root: resource.Properties,
-                //        evaluationContext: evaluationContext,
-                //        skipEvaluationPaths: resource.SkipEvaluationPaths);
-                //}
+        //        //    resource.Properties = ExpressionsEngine.EvaluateLanguageExpressionsRecursive(
+        //        //        root: resource.Properties,
+        //        //        evaluationContext: evaluationContext,
+        //        //        skipEvaluationPaths: resource.SkipEvaluationPaths);
+        //        //}
 
-                //if (this.Metadata.Resource.IsDeploymentType())
-                //{
-                //    this.UpdateNestedDeploymentRelativePath(deployment);
-                //}
+        //        //if (this.Metadata.Resource.IsDeploymentType())
+        //        //{
+        //        //    this.UpdateNestedDeploymentRelativePath(deployment);
+        //        //}
 
-                this.Metadata.AreTemplateExpressionsEvaluated = true;
-            }
-            catch (Exception ex)
-            {
-                if (!(ex is TemplateException || ex is ExpressionException))
-                {
-                    throw;
-                }
+        //        this.Metadata.AreTemplateExpressionsEvaluated = true;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        if (!(ex is TemplateException || ex is ExpressionException))
+        //        {
+        //            throw;
+        //        }
 
-                this.Logger.LogDebug(
-                    exception: ex,
-                    operationName: "DeploymentResourceJob.ProcessResourceLanguageExpressions",
-                    format: "Unable to process template language expressions for resource '{0}'.",
-                    arg0: resource.GetFullyQualifiedResourceId());
+        //        this.Logger.LogDebug(
+        //            exception: ex,
+        //            operationName: "DeploymentResourceJob.ProcessResourceLanguageExpressions",
+        //            format: "Unable to process template language expressions for resource '{0}'.",
+        //            arg0: resource.GetFullyQualifiedResourceId());
 
-                var lineNumber = resource.DeploymentResourceLineInfo != null ? resource.DeploymentResourceLineInfo.LineNumber : null;
-                var linePosition = resource.DeploymentResourceLineInfo != null ? resource.DeploymentResourceLineInfo.LinePosition : null;
-                var additionalInfo = Microsoft.WindowsAzure.ResourceStack.Common.Extensions.ObjectExtensions.AsArray(new TemplateViolationErrorInfo(
-                    new TemplateErrorAdditionalInfo(lineNumber: lineNumber, positionNumber: linePosition)));
+        //        var lineNumber = resource.DeploymentResourceLineInfo != null ? resource.DeploymentResourceLineInfo.LineNumber : null;
+        //        var linePosition = resource.DeploymentResourceLineInfo != null ? resource.DeploymentResourceLineInfo.LinePosition : null;
+        //        var additionalInfo = Microsoft.WindowsAzure.ResourceStack.Common.Extensions.ObjectExtensions.AsArray(new TemplateViolationErrorInfo(
+        //            new TemplateErrorAdditionalInfo(lineNumber: lineNumber, positionNumber: linePosition)));
 
-                var errorResponseMessage = new ErrorResponseMessage(
-                    code: ErrorResponseCode.InvalidTemplate,
-                    message: Microsoft.WindowsAzure.ResourceStack.Common.Instrumentation.LocalizationExtensions.ToLocalizedMessage(ErrorResponseMessages.InvalidTemplateLanguageExpression, resource.GetFullyQualifiedResourceId(), lineNumber, linePosition, ex.Message),
-                    additionalInfo: additionalInfo);
+        //        var errorResponseMessage = new ErrorResponseMessage(
+        //            code: ErrorResponseCode.InvalidTemplate,
+        //            message: Microsoft.WindowsAzure.ResourceStack.Common.Instrumentation.LocalizationExtensions.ToLocalizedMessage(ErrorResponseMessages.InvalidTemplateLanguageExpression, resource.GetFullyQualifiedResourceId(), lineNumber, linePosition, ex.Message),
+        //            additionalInfo: additionalInfo);
 
-                this.Metadata.ResourceOperationStatusCode = HttpStatusCode.BadRequest;
-                this.Metadata.ResourceOperationStatusMessage = errorResponseMessage.ToJToken();
+        //        this.Metadata.ResourceOperationStatusCode = HttpStatusCode.BadRequest;
+        //        this.Metadata.ResourceOperationStatusMessage = errorResponseMessage.ToJToken();
 
-                throw new JobExecutionResultException(
-                    status: JobExecutionStatus.Failed,
-                    message: string.Format("Unable to process template language expressions for resource '{0}' at line '{1}' and column '{2}'. Current deployment operation failed. Exception: '{3}'.", resource.GetResourceName(), lineNumber, linePosition, ex.Message),
-                    details: ex.GetType().Name,
-                    nextMetadata: this.Metadata.ToJson());
-            }
-        }
+        //        throw new JobExecutionResultException(
+        //            status: JobExecutionStatus.Failed,
+        //            message: string.Format("Unable to process template language expressions for resource '{0}' at line '{1}' and column '{2}'. Current deployment operation failed. Exception: '{3}'.", resource.GetResourceName(), lineNumber, linePosition, ex.Message),
+        //            details: ex.GetType().Name,
+        //            nextMetadata: this.Metadata.ToJson());
+        //    }
+        //}
 
         // TODO required for reference.
         ///// <summary>
