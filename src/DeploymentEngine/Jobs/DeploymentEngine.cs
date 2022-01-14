@@ -42,7 +42,7 @@ namespace DeploymentEngine.Jobs
         private readonly JobDispatcherClient jobDispatcherClient;
 
         // URI to radius service.
-        private readonly Uri frontendUri = new Uri("https://radius-service.radius-system.svc.cluster.local");
+        private readonly Uri frontendUri = new Uri("https://radius-service.radius-system.svc.cluster.local/apis/api.radius.dev/v1alpha1/");
         private DependencyProcessor dependencyProcessor;
 
         public JobManagementClient JobManagementClient => this.jobDispatcherClient.JobManagement;

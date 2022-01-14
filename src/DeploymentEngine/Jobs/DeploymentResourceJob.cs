@@ -24,7 +24,7 @@ using System.Net.Http.Formatting;
 using System.Net.Http.Headers;
 using ErrorResponseCode = global::Azure.Deployments.Core.ErrorResponses.DeploymentsErrorResponseCode;
 using DeploymentsProvisioningState = global::Azure.Deployments.Core.Definitions.ProvisioningState;
-
+using Microsoft.WindowsAzure.ResourceStack.Frontdoor.Worker.Engines;
 
 namespace DeploymentEngine.Jobs
 {
@@ -93,16 +93,16 @@ namespace DeploymentEngine.Jobs
         {
             try
             {
-                var deployment = await this.GetCurrentDeploymentSequence().ConfigureAwait(continueOnCapturedContext: false);
-                if (deployment.ProvisioningState != ProvisioningState.Running)
-                {
-                    return new JobExecutionResult
-                    {
-                        Status = JobExecutionStatus.Failed,
-                        Message = string.Format("Deployment provisioning state '{0}' is not expected. Current deployment operation is failed.", deployment.ProvisioningState),
-                        Details = deployment.ProvisioningState.ToString(),
-                    };
-                }
+                IDeploymentEntity deployment = null;
+                //if (deployment.ProvisioningState != ProvisioningState.Running)
+                //{
+                //    return new JobExecutionResult
+                //    {
+                //        Status = JobExecutionStatus.Failed,
+                //        Message = string.Format("Deployment provisioning state '{0}' is not expected. Current deployment operation is failed.", deployment.ProvisioningState),
+                //        Details = deployment.ProvisioningState.ToString(),
+                //    };
+                //}
 
                 var operationTimeout = await this
                     .GetOperationTimeout(resourceOperation: this.Metadata.ResourceOperation)
@@ -217,11 +217,11 @@ namespace DeploymentEngine.Jobs
         /// <param name="deployment">The deployment.</param>
         private async Task<JobExecutionResult> CreateResource(IDeploymentEntity deployment)
         {
-            await this
-                .ProcessResourceLanguageExpressions(
-                    resource: this.Metadata.Resource,
-                    deployment: deployment)
-                .ConfigureAwait(continueOnCapturedContext: false);
+            //await this
+            //    .ProcessResourceLanguageExpressions(
+            //        resource: this.Metadata.Resource,
+            //        deployment: deployment)
+            //    .ConfigureAwait(continueOnCapturedContext: false);
 
             var definition = new ResourceProxyDefinition
             {
@@ -246,8 +246,7 @@ namespace DeploymentEngine.Jobs
                 requestMethod: HttpMethod.Put,
                 requestUri: this.Metadata.ResourceOperationUri,
                 cancellationToken: this.CancellationToken,
-                content: httpContent,
-                addHeadersFunc: this.AddNotificationToken)
+                content: httpContent)
                 .ConfigureAwait(continueOnCapturedContext: false))
             {
                 this.Metadata.ServiceRequestId = response.Headers?.GetServiceRequestId(defaultValue: null);
@@ -1071,31 +1070,34 @@ namespace DeploymentEngine.Jobs
         /// <summary>
         /// Gets the current deployment sequence.
         /// </summary>
-        protected async Task<IDeploymentEntity> FindLatestDeploymentSequence()
+        protected Task<IDeploymentEntity> FindLatestDeploymentSequence()
         {
-            if (this.Metadata.IsTenantDeployment)
-            {
-                return await this
-                    .GetDeploymentDataProvider(location: this.Metadata.GetDeploymentLocation())
-                    .FindTenantDeployment(
-                        tenantId: this.Metadata.TenantId,
-                        managementGroupId: this.Metadata.ManagementGroupId,
-                        deploymentName: this.Metadata.DeploymentName)
-                    .ConfigureAwait(continueOnCapturedContext: false);
-            }
+            return Task.FromResult<IDeploymentEntity>(null);
+            // TODO figure this out...
+            //if (this.Metadata.IsTenantDeployment)
+            //{
+            //    return await this
+            //        .GetDeploymentDataProvider(location: this.Metadata.GetDeploymentLocation())
+            //        .FindTenantDeployment(
+            //            tenantId: this.Metadata.TenantId,
+            //            managementGroupId: this.Metadata.ManagementGroupId,
+            //            deploymentName: this.Metadata.DeploymentName)
+            //        .ConfigureAwait(continueOnCapturedContext: false);
+            //}
 
-            return await this
-                .GetDeploymentDataProvider(location: this.Metadata.GetDeploymentLocation())
-                .FindDeployment(
-                    subscriptionId: this.Metadata.SubscriptionId,
-                    resourceGroupName: this.Metadata.ResourceGroupName,
-                    deploymentName: this.Metadata.DeploymentName)
-                .ConfigureAwait(continueOnCapturedContext: false);
+            //return await this
+            //    .GetDeploymentDataProvider(location: this.Metadata.GetDeploymentLocation())
+            //    .FindDeployment(
+            //        subscriptionId: this.Metadata.SubscriptionId,
+            //        resourceGroupName: this.Metadata.ResourceGroupName,
+            //        deploymentName: this.Metadata.DeploymentName)
+            //    .ConfigureAwait(continueOnCapturedContext: false);
         }
 
-        private DeploymentDataProvider GetDeploymentDataProvider(string location)
-        {
-        }
+        //private DeploymentDataProvider GetDeploymentDataProvider(string location)
+        //{
+
+        //}
 
         /// <summary>
         /// Calls the front door service.
@@ -1107,7 +1109,7 @@ namespace DeploymentEngine.Jobs
         /// <param name="addHeadersFunc">Callback to add headers.</param>
         protected async Task<HttpResponseMessage> CallFrontdoorService(HttpMethod requestMethod, Uri requestUri, CancellationToken cancellationToken, HttpContent content = null, Action<HttpRequestHeaders> addHeadersFunc = null)
         {
-            var frontdoorClient = new LocalFrontdoorRequestClient(this.FrontdoorConfiguration, this.HttpConfiguration);
+            var frontdoorClient = new LocalFrontdoorRequestClient();
 
             return await frontdoorClient
                 .SendAsync(
@@ -1115,40 +1117,8 @@ namespace DeploymentEngine.Jobs
                     requestUri: requestUri,
                     cancellationToken: cancellationToken,
                     content: content,
-                    addHeadersFunc: this.AddDefaultHeadersForBackgroundJobs + addHeadersFunc)
+                    addHeadersFunc: addHeadersFunc)
                 .ConfigureAwait(continueOnCapturedContext: false);
-        }
-
-        /// <summary>
-        /// Adds a notification token header to the headers collection.
-        /// </summary>
-        /// <param name="httpHeaders">The HTTP headers collection.</param>
-        private void AddNotificationToken(HttpRequestHeaders httpHeaders)
-        {
-            if (FrontdoorConfiguration.AllowedProvidersForAsyncCallback.ContainsInsensitively(this.Metadata.Resource.GetResourceProviderNamespace()))
-            {
-                var notificationTokenDefinition = new AsyncOperationCallbackTokenDefinition
-                {
-                    JobDefinitions = new List<AsyncOperationCallbackJobDefinition>
-                    {
-                        new AsyncOperationCallbackJobDefinition
-                        {
-                            JobId = this.BackgroundJob.JobId,
-                            JobIdPrefix = this.BackgroundJob.JobId,
-                            JobPartition = this.BackgroundJob.JobPartition,
-                            Location = this.BackgroundJob.CurrentExecutionAffinity
-                        },
-                    },
-                    ResourceType = this.Metadata.Resource.GetFullyQualifiedResourceType()
-                };
-
-                var notificationUri = UriTemplateEngine.CreateAsyncOperationCallbackUri(
-                    endpoint: this.Metadata.FrontdoorEndpoint,
-                    asyncOperationCallbackTokenData: notificationTokenDefinition.ToJson().EncodeToBase64String(),
-                    apiVersion: FrontdoorConstants.ApiVersion20180201);
-
-                httpHeaders.AddAsyncCallbackTokenHeader(notificationUri.AbsoluteUri);
-            }
         }
 
         /// <summary>
@@ -1157,148 +1127,150 @@ namespace DeploymentEngine.Jobs
         /// <typeparam name="T">The type of the object to serialize.</typeparam>
         /// <param name="body">The object to serialize.</param>
         /// <param name="mediaTypeFormatter">The media type formatter.</param>
-        public static HttpContent CreateJsonContent<T>(T body, MediaTypeFormatter mediaTypeFormatter = null)
+        public HttpContent CreateJsonContent<T>(T body, MediaTypeFormatter mediaTypeFormatter = null)
             where T : class
-            => (body != null) ? new ObjectContent<T>(body, mediaTypeFormatter ?? HttpHelper.JsonMediaTypeFormatter) : null;
+            => (body != null) ? new ObjectContent<T>(body, mediaTypeFormatter ?? JsonObjectTypeFormatter) : null;
 
-        /// <summary>
-        /// Fetches a set of resource references from deployment sequencer job metadata.
-        /// </summary>
-        /// <param name="deployment">The deployment.</param>
-        /// <param name="references">The resource references.</param>
-        protected async Task<IReadOnlyDictionary<DeploymentResourceReference, JToken>> FetchResourcesFromSequencerActions(IDeploymentEntity deployment, IEnumerable<DeploymentResourceReference> references)
-        {
-            var results = await references
-                .CoalesceEnumerable()
-                .Select(async reference => await FetchResourceReferenceValueFromSequencerAction(deployment, reference).ConfigureAwait(false))
-                .WhenAllForAwait()
-                .ConfigureAwait(false);
+        ///// <summary>
+        ///// Fetches a set of resource references from deployment sequencer job metadata.
+        ///// </summary>
+        ///// <param name="deployment">The deployment.</param>
+        ///// <param name="references">The resource references.</param>
+        //protected async Task<IReadOnlyDictionary<DeploymentResourceReference, JToken>> FetchResourcesFromSequencerActions(IDeploymentEntity deployment, IEnumerable<DeploymentResourceReference> references)
+        //{
+        //    var results = await Microsoft.WindowsAzure.ResourceStack.Common.Extensions.AsyncExtensions.WhenAllForAwait(Microsoft.WindowsAzure.ResourceStack.Common.Extensions.IEnumerableExtensions.CoalesceEnumerable(references)
+        //        .Select(async reference => await FetchResourceReferenceValueFromSequencerAction(deployment, reference).ConfigureAwait(false)))
+        //        .ConfigureAwait(false);
 
-            return results.ToDictionary(
-                r => r.reference,
-                r => r.value,
-                DeploymentResourceReference.EqualityComparer.Instance);
-        }
+        //    return results.ToDictionary(
+        //        r => r.reference,
+        //        r => r.value,
+        //        DeploymentResourceReference.EqualityComparer.Instance);
+        //}
 
 
         /// <summary>
         /// Fetches a resource reference from deployment sequencer job metadata.
         /// </summary>
         /// <param name="deployment">The deployment.</param>
-        /// <param name="reference">The resource reference.</param>
-        private async Task<(DeploymentResourceReference reference, JToken value, bool hasSymbolicName)> FetchResourceReferenceValueFromSequencerAction(IDeploymentEntity deployment, DeploymentResourceReference reference)
-        {
-            var action = await this
-                .GetJobsDataProvider(this.Metadata.GetDeploymentLocation())
-                .GetDeploymentJobAction(
-                    deployment: deployment,
-                    actionId: DeploymentEngine.GetDeploymentJobSequencerId(reference))
-                .ConfigureAwait(continueOnCapturedContext: false);
+        ///// <param name="reference">The resource reference.</param>
+        //private async Task<(DeploymentResourceReference reference, JToken value, bool hasSymbolicName)> FetchResourceReferenceValueFromSequencerAction(IDeploymentEntity deployment, DeploymentResourceReference reference)
+        //{
+        //    await Task.CompletedTask;
+        //    return (null, null, null);
+        //    //var action = await this
+        //    //    .GetJobsDataProvider(this.Metadata.GetDeploymentLocation())
+        //    //    .GetDeploymentJobAction(
+        //    //        deployment: deployment,
+        //    //        actionId: DeploymentEngine.GetDeploymentJobSequencerId(reference))
+        //    //    .ConfigureAwait(continueOnCapturedContext: false);
 
-            if (action is null)
-            {
-                throw new InvalidOperationException($"The referenced deployment operation '{reference.ToJson()}' could not be found.");
-            }
+        //    //if (action is null)
+        //    //{
+        //    //    throw new InvalidOperationException($"The referenced deployment operation '{reference.ToJson()}' could not be found.");
+        //    //}
 
-            var output = TryGetResourceReferenceFromSequencerAction(action);
-            if (!output.HasValue)
-            {
-                // Note(antmarti): We don't expect to hit this in practice, because DeploymentEngine.GetDeploymentJobSequencerId will only
-                // ever return a DeploymentResourceJob or DeploymentExtensibleResourceJob sequencer action - in both cases, TryGetResourceReferenceFromSequencerAction
-                // will return non-null values.
-                throw new InvalidOperationException($"Unable to fetch resource reference from callback {action.Callback}");
-            }
+        //    //var output = TryGetResourceReferenceFromSequencerAction(action);
+        //    //if (!output.HasValue)
+        //    //{
+        //    //    // Note(antmarti): We don't expect to hit this in practice, because DeploymentEngine.GetDeploymentJobSequencerId will only
+        //    //    // ever return a DeploymentResourceJob or DeploymentExtensibleResourceJob sequencer action - in both cases, TryGetResourceReferenceFromSequencerAction
+        //    //    // will return non-null values.
+        //    //    throw new InvalidOperationException($"Unable to fetch resource reference from callback {action.Callback}");
+        //    //}
 
-            return output.Value;
-        }
-
-
-        /// <summary>
-        /// Gets resource reference metadata from deployment sequencer job metadata.
-        /// </summary>
-        /// <param name="action">The sequencer action</param>
-        private static (DeploymentResourceReference reference, JToken value, bool hasSymbolicName)? TryGetResourceReferenceFromSequencerAction(SequencerAction action)
-        {
-            if (action.Result != SequencerActionResult.Succeeded)
-            {
-                throw new InvalidOperationException($"The referenced deployment operation '{action.ActionId}' is not completed successfully (current state: '{action.Result}'");
-            }
-
-            if (action.Callback.EqualsOrdinalInsensitively("DeploymentResourceJob"))
-            {
-                var metadata = action.Metadata.FromJson<DeploymentResourceJobMetadata>();
-
-                var hasSymbolicName = !string.IsNullOrWhiteSpace(metadata.Resource.SymbolicName);
-                return (reference: metadata.Resource, value: metadata.Resource.ToJToken(), hasSymbolicName: hasSymbolicName);
-            }
-
-            //if (action.Callback.EqualsOrdinalInsensitively(DeploymentExtensibleResourceJob.JobName))
-            //{
-            //    var metadata = action.Metadata.FromJson<DeploymentExtensibleResourceJobMetadata>();
-
-            //    var reference = DeploymentResourceReference.ForExtensibleResource(metadata.Resource.SymbolicName);
-
-            //    var value = new JObject
-            //    {
-            //        ["Properties"] = metadata.ReturnedProperties.DeepClone(),
-            //    };
-
-            //    // Note(antmarti): Extensible resources always use symbolic names.
-            //    return (reference: reference, value: value, hasSymbolicName: true);
-            //}
-
-            // Note(antmarti): This method is called in DeploymentLastJob with the full set of job sequencer actions
-            // - including those not corresponding to DeploymentResourceJob / DeploymentExtensibleResourceJob instances.
-            // We don't want to throw an exception in this case, so return null and let the caller decide.
-            return null;
-        }
+        //    //return output.Value;
 
 
-        /// <summary>
-        /// Gets the template expression evaluation helper.
-        /// </summary>
-        /// <param name="deployment">The deployment.</param>
-        /// <param name="referenceValueLookup">The reference value lookup.</param>
-        /// <param name="copyContext">The copy context.</param>
-        /// <param name="sequencerActions">sequencer actions.</param>
-        /// <param name="hasSymbolicName">Indicates if resource has symbolic name.</param>
-        protected ExpressionEvaluationContext GetTemplateExpressionEvaluationContext(
-            IDeploymentEntity deployment,
-            IReadOnlyDictionary<DeploymentResourceReference, JToken> referenceValueLookup,
-            TemplateCopyContext copyContext,
-            SequencerAction[] sequencerActions,
-            bool hasSymbolicName)
-        {
-            var symbolicNameLookup = hasSymbolicName ? this.GetSymbolicNameLookupFromSequencerActions(sequencerActions) : null;
+        //}
 
-            //var extensibleResources = this.GetExtensibleResourcesFromSequencerActions(sequencerActions);
 
-            return DeploymentEngineUtils
-                .GetTemplateExpressionEvaluationContext(
-                    deployment: deployment,
-                    symbolicNameLookup: symbolicNameLookup,
-                    referenceValueLookup: referenceValueLookup,
-                    extensibleResources: new Dictionary<string, ExtensibleResource>(),
-                    copyContext: copyContext,
-                    eventSource: new DeploymentsEventSource(eventSource: this.FrontdoorConfiguration.EventSource));
-        }
+        ///// <summary>
+        ///// Gets resource reference metadata from deployment sequencer job metadata.
+        ///// </summary>
+        ///// <param name="action">The sequencer action</param>
+        //private static (DeploymentResourceReference reference, JToken value, bool hasSymbolicName)? TryGetResourceReferenceFromSequencerAction(SequencerAction action)
+        //{
+        //    if (action.Result != SequencerActionResult.Succeeded)
+        //    {
+        //        throw new InvalidOperationException($"The referenced deployment operation '{action.ActionId}' is not completed successfully (current state: '{action.Result}'");
+        //    }
 
-        /// <summary>
-        /// Gets resource symbolic name lookup from sequencer actions.
-        /// </summary>
-        /// <param name="resourceSequencerActions">The sequencer actions.</param>
-        private IReadOnlyDictionary<string, DeploymentResource> GetSymbolicNameLookupFromSequencerActions(SequencerAction[] resourceSequencerActions)
-        {
-            var resourceActionsMetadata = resourceSequencerActions
-                .Where(resourceSequencerAction => resourceSequencerAction.Callback.EqualsOrdinalInsensitively(nameof(DeploymentResourceJob)))
-                .Select(resourceSequencerAction => resourceSequencerAction.Metadata.FromJson<DeploymentResourceJobMetadata>())
-                .Where(metadata => metadata.Resource.IsTemplateResource);
+        //    if (action.Callback.EqualsOrdinalInsensitively("DeploymentResourceJob"))
+        //    {
+        //        var metadata = action.Metadata.FromJson<DeploymentResourceJobMetadata>();
 
-            // Symbolic names are case sensitive.
-            return resourceActionsMetadata.ToDictionary(
-                keySelector: metadata => metadata.Resource.SymbolicName,
-                elementSelector: metadata => metadata.Resource,
-                comparer: CoreConstants.SymbolicNameComparer);
-        }
+        //        var hasSymbolicName = !string.IsNullOrWhiteSpace(metadata.Resource.SymbolicName);
+        //        return (reference: metadata.Resource, value: metadata.Resource.ToJToken(), hasSymbolicName: hasSymbolicName);
+        //    }
+
+        //    //if (action.Callback.EqualsOrdinalInsensitively(DeploymentExtensibleResourceJob.JobName))
+        //    //{
+        //    //    var metadata = action.Metadata.FromJson<DeploymentExtensibleResourceJobMetadata>();
+
+        //    //    var reference = DeploymentResourceReference.ForExtensibleResource(metadata.Resource.SymbolicName);
+
+        //    //    var value = new JObject
+        //    //    {
+        //    //        ["Properties"] = metadata.ReturnedProperties.DeepClone(),
+        //    //    };
+
+        //    //    // Note(antmarti): Extensible resources always use symbolic names.
+        //    //    return (reference: reference, value: value, hasSymbolicName: true);
+        //    //}
+
+        //    // Note(antmarti): This method is called in DeploymentLastJob with the full set of job sequencer actions
+        //    // - including those not corresponding to DeploymentResourceJob / DeploymentExtensibleResourceJob instances.
+        //    // We don't want to throw an exception in this case, so return null and let the caller decide.
+        //    return null;
+        //}
+
+
+        ///// <summary>
+        ///// Gets the template expression evaluation helper.
+        ///// </summary>
+        ///// <param name="deployment">The deployment.</param>
+        ///// <param name="referenceValueLookup">The reference value lookup.</param>
+        ///// <param name="copyContext">The copy context.</param>
+        ///// <param name="sequencerActions">sequencer actions.</param>
+        ///// <param name="hasSymbolicName">Indicates if resource has symbolic name.</param>
+        //protected ExpressionEvaluationContext GetTemplateExpressionEvaluationContext(
+        //    IDeploymentEntity deployment,
+        //    IReadOnlyDictionary<DeploymentResourceReference, JToken> referenceValueLookup,
+        //    TemplateCopyContext copyContext,
+        //    SequencerAction[] sequencerActions,
+        //    bool hasSymbolicName)
+        //{
+        //    var symbolicNameLookup = hasSymbolicName ? this.GetSymbolicNameLookupFromSequencerActions(sequencerActions) : null;
+
+        //    //var extensibleResources = this.GetExtensibleResourcesFromSequencerActions(sequencerActions);
+
+        //    return DeploymentEngineUtils
+        //        .GetTemplateExpressionEvaluationContext(
+        //            deployment: deployment,
+        //            symbolicNameLookup: symbolicNameLookup,
+        //            referenceValueLookup: referenceValueLookup,
+        //            extensibleResources: new Dictionary<string, ExtensibleResource>(),
+        //            copyContext: copyContext,
+        //            eventSource: new DeploymentsEventSource(eventSource: this.FrontdoorConfiguration.EventSource));
+        //}
+
+        ///// <summary>
+        ///// Gets resource symbolic name lookup from sequencer actions.
+        ///// </summary>
+        ///// <param name="resourceSequencerActions">The sequencer actions.</param>
+        //private IReadOnlyDictionary<string, DeploymentResource> GetSymbolicNameLookupFromSequencerActions(SequencerAction[] resourceSequencerActions)
+        //{
+        //    var resourceActionsMetadata = resourceSequencerActions
+        //        .Where(resourceSequencerAction => resourceSequencerAction.Callback.EqualsOrdinalInsensitively(nameof(DeploymentResourceJob)))
+        //        .Select(resourceSequencerAction => resourceSequencerAction.Metadata.FromJson<DeploymentResourceJobMetadata>())
+        //        .Where(metadata => metadata.Resource.IsTemplateResource);
+
+        //    // Symbolic names are case sensitive.
+        //    return resourceActionsMetadata.ToDictionary(
+        //        keySelector: metadata => metadata.Resource.SymbolicName,
+        //        elementSelector: metadata => metadata.Resource,
+        //        comparer: CoreConstants.SymbolicNameComparer);
+        //}
     }
 }
