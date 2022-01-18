@@ -19,6 +19,7 @@ using DeploymentEngine.Controllers;
 using Microsoft.WindowsAzure.ResourceStack.Common.BackgroundJobs;
 using Microsoft.WindowsAzure.ResourceStack.Common.EventSources;
 using Microsoft.WindowsAzure.ResourceStack.Common.Storage.Volatile;
+using Microsoft.WindowsAzure.ResourceStack.Frontdoor.Data.Engines;
 using Newtonsoft.Json.Linq;
 using System.Globalization;
 using DeploymentsProvisioningState = global::Azure.Deployments.Core.Definitions.ProvisioningState;
@@ -42,7 +43,8 @@ namespace DeploymentEngine.Jobs
         private readonly JobDispatcherClient jobDispatcherClient;
 
         // URI to radius service.
-        private readonly Uri frontendUri = new Uri("https://radius-service.radius-system.svc.cluster.local/apis/api.radius.dev/v1alpha1/");
+        //private readonly Uri frontendUri = new Uri("https://radius-service.radius-system.svc.cluster.local/apis/api.radius.dev/v1alpha1/");
+        private readonly Uri frontendUri = new Uri("http://localhost:7443/apis/api.radius.dev/v1alpha1/");
         private DependencyProcessor dependencyProcessor;
 
         public JobManagementClient JobManagementClient => this.jobDispatcherClient.JobManagement;
@@ -828,56 +830,12 @@ namespace DeploymentEngine.Jobs
                 ? deploymentResource.GetUnqualifiedResourceId().Trim('/') + '/' + deploymentResource.ReferenceAction
                 : deploymentResource.GetUnqualifiedResourceId().Trim('/');
 
-            return GetResourceUri(
+            return UriTemplateEngine.GetResourceUri(
                 endpoint: frontdoorEndpoint,
                 subscriptionId: deploymentResource.SubscriptionId,
                 resourceGroupName: deploymentResource.ResourceGroupName,
                 resourceId: normalizedResourceId,
                 apiVersion: deploymentResource.ApiVersion);
-        }
-
-        /// <summary>
-        /// Gets the resource URI.
-        /// </summary>
-        /// <param name="endpoint">The endpoint.</param>
-        /// <param name="subscriptionId">The subscription identifier.</param>
-        /// <param name="resourceGroupName">Name of the resource group.</param>
-        /// <param name="resourceId">The resource identifier.</param>
-        /// <param name="apiVersion">The API version.</param>
-        /// <param name="extraParametersInURL">The extra parameters in the URL.</param>
-        public static Uri GetResourceUri(Uri endpoint, string subscriptionId, string resourceGroupName, string resourceId, string apiVersion, Dictionary<string, string> extraParametersInURL = null)
-        {
-            //if (string.IsNullOrEmpty(subscriptionId))
-            //{
-            //    return UriTemplateEngine.GetTenantResourceUri(
-            //        endpoint: endpoint,
-            //        resourceId: resourceId,
-            //        apiVersion: apiVersion);
-            //}
-
-            //if (string.IsNullOrEmpty(resourceGroupName))
-            //{
-            //    return UriTemplateEngine.GetResourceUri(
-            //        endpoint: endpoint,
-            //        subscriptionId: subscriptionId,
-            //        resourceId: resourceId,
-            //        apiVersion: apiVersion);
-            //}
-
-            var parameters = new Dictionary<string, string>()
-            {
-                { "subscriptionId", subscriptionId },
-                { "resourceGroupName", resourceGroupName },
-                { "resourceId", resourceId },
-                { "api-version", apiVersion },
-            };
-
-            parameters = extraParametersInURL.CoalesceDictionary().Any()
-                ? parameters.Union(extraParametersInURL).ToDictionary(k => k.Key, v => v.Value)
-                : parameters;
-
-            return new Uri(endpoint.AbsoluteUri); // TODO add URI Stuff here.
-            //return UriTemplateEngine.ResourceUriTemplate.BindByName(baseAddress: endpoint, parameters: parameters);
         }
 
         private SequencerBuilder CreateDeploymentSequencer(Uri frontdoorEndpoint,
