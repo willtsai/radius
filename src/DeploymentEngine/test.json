@@ -1,0 +1,40 @@
+
+
+{
+  "properties": {
+    "mode": "incremental",
+    "template": {
+      "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+      "contentVersion": "1.0.0.0",
+      "metadata": {
+        "_generator": {
+          "name": "bicep",
+          "version": "0.4.1133.19325",
+          "templateHash": "7074678489234203049"
+        }
+      },
+      "resources": [
+        {
+          "type": "Microsoft.CustomProviders/resourceProviders/Application/Container",
+          "apiVersion": "2018-09-01-preview",
+          "name": "[format('{0}/{1}/{2}', 'radiusv3', 'myapp', 'backend')]",
+          "properties": {
+            "container": {
+              "image": "registry/container:tag"
+            }
+          },
+          "dependsOn": [
+            "[resourceId('Microsoft.CustomProviders/resourceProviders/Application', 'radiusv3', 'myapp')]"
+          ]
+        },
+        {
+          "type": "Microsoft.CustomProviders/resourceProviders/Application",
+          "apiVersion": "2018-09-01-preview",
+          "name": "[format('{0}/{1}', 'radiusv3', 'myapp')]"
+        }
+      ]
+    },
+    "parameters": {
+    }
+  }
+}

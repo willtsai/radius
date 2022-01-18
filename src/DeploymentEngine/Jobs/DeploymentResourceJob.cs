@@ -77,11 +77,6 @@ namespace DeploymentEngine.Jobs
         {
             var provisionResult = await ProvisionResource();
 
-            // TODO create radius resource for deployment
-            // OR call RP contract on update resource.
-            // Would love some sort of way to poll better here for deployment.
-            Metadata = JToken.Parse(this.BackgroundJob.Metadata).ToObject<DeploymentResourceJobMetadata>();
-
             return provisionResult;
         }
 
