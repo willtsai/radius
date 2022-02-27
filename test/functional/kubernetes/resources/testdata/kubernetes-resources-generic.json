@@ -1,0 +1,56 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "languageVersion": "1.9-experimental",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+    "_generator": {
+      "name": "bicep",
+      "version": "0.4.1150.60425",
+      "templateHash": "2759492833042742541"
+    }
+  },
+  "resources": {
+    "twilio": {
+      "type": "Microsoft.CustomProviders/resourceProviders/Application/Generic",
+      "apiVersion": "2018-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', 'radiusv3', 'kubernetes-resources-generic', 'twilio')]",
+      "properties": {
+        "properties": {
+          "fromNumber": "222-222-2222"
+        },
+        "secrets": {
+          "accountSid": "sid",
+          "authToken": "token"
+        }
+      },
+      "dependsOn": [
+        "app"
+      ]
+    },
+    "myapp": {
+      "type": "Microsoft.CustomProviders/resourceProviders/Application/Container",
+      "apiVersion": "2018-09-01-preview",
+      "name": "[format('{0}/{1}/{2}', 'radiusv3', 'kubernetes-resources-generic', 'myapp')]",
+      "properties": {
+        "container": {
+          "image": "radius.azurecr.io/magpie:latest",
+          "env": {
+            "TWILIO_NUMBER": "[reference('twilio').fromNumber]",
+            "TWILIO_SID": "[listSecrets(resourceId('Microsoft.CustomProviders/resourceProviders', 'radiusv3'), '2018-09-01-preview', createObject('targetId', resourceInfo('twilio').id)).accountSid]",
+            "TWILIO_ACCOUNT": "[listSecrets(resourceId('Microsoft.CustomProviders/resourceProviders', 'radiusv3'), '2018-09-01-preview', createObject('targetId', resourceInfo('twilio').id)).authToken]"
+          }
+        }
+      },
+      "dependsOn": [
+        "app",
+        "twilio"
+      ]
+    },
+    "app": {
+      "type": "Microsoft.CustomProviders/resourceProviders/Application",
+      "apiVersion": "2018-09-01-preview",
+      "name": "[format('{0}/{1}', 'radiusv3', 'kubernetes-resources-generic')]"
+    }
+  }
+}

@@ -492,7 +492,14 @@ func (r *rp) ListSecrets(ctx context.Context, input resourceprovider.ListSecrets
 	namespace := id.ResourceGroup
 	err = r.validateResourceType(id)
 	if err != nil {
-		return rest.NewBadRequestResponse(err.Error()), nil
+		// HACK: for now handle resource type that isn't quite valid, seems to be the only call with this invalid
+		// signature.
+		split := strings.Split(input.TargetID, "/")
+		if split[1] == "providers" && split[2] == "Microsoft.CustomProviders" && split[3] == "resourceProviders" && split[4] != "radiusv3" {
+			id = azresources.ResourceID{}
+		} else {
+			return rest.NewBadRequestResponse(err.Error()), nil
+		}
 	}
 
 	kind, ok := armtemplate.GetKindFromArmType(r.getResourceTypeFromResourceId(id))
