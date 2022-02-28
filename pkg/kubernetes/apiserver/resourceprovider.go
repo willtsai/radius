@@ -585,7 +585,9 @@ func (r *rp) GetOperation(ctx context.Context, id azresources.ResourceID) (rest.
 		Kind:    kind,
 	})
 	err = r.client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: kubernetes.MakeResourceName(r.getApplicationNameFromResourceId(targetID), r.getResourceNameFromResourceId(targetID))}, &item)
-	if err != nil {
+	if err != nil && controller_runtime.IgnoreNotFound(err) == nil {
+		return rest.NewNotFoundResponse(id), nil
+	} else if err != nil {
 		return nil, err
 	}
 

@@ -863,6 +863,51 @@ func Test_GetOperation(t *testing.T) {
 	require.Equal(t, rest.NewOKResponse(expected), response)
 }
 
+func Test_GetOperation_NotFound(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(radiusv1alpha3.AddToScheme(scheme))
+	appName := "my-app"
+	// Simulate a *rendered* resource
+	app := radiusv1alpha3.Application{
+		TypeMeta: v1.TypeMeta{
+			APIVersion: radiusv1alpha3.GroupVersion.String(),
+			Kind:       "Application",
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      appName,
+			Namespace: Namespace,
+		},
+		Spec: radiusv1alpha3.ApplicationSpec{
+			Template: rawOrPanic(map[string]interface{}{
+				"body": map[string]interface{}{
+					"properties": map[string]interface{}{
+						"definition-property": "definition-value",
+					},
+				},
+			}),
+		},
+	}
+
+	resource1Name := "my-resource"
+	expectedID1, err := azresources.Parse(azresources.MakeID(
+		"kubernetes",
+		Namespace,
+		azresources.ResourceType{Type: "Microsoft.CustomProviders/resourceProviders", Name: "radiusv3"},
+		azresources.ResourceType{Type: "Application", Name: appName},
+		azresources.ResourceType{Type: "HttpRoute", Name: resource1Name},
+		azresources.ResourceType{Type: azresources.OperationResourceType}))
+	require.NoError(t, err)
+
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(&app).Build()
+
+	rp := NewResourceProvider(c, BaseURL, "http")
+
+	response, err := rp.GetOperation(context.Background(), expectedID1)
+	require.NoError(t, err)
+	require.Equal(t, rest.NewNotFoundResponse(expectedID1), response)
+}
+
 func rawOrPanic(obj interface{}) *runtime.RawExtension {
 	b, err := json.Marshal(obj)
 	if err != nil {
