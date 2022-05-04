@@ -15,6 +15,7 @@ import (
 	"github.com/project-radius/radius/pkg/corerp/middleware"
 	mp "github.com/project-radius/radius/pkg/telemetry/metricsprovider"
 	"github.com/project-radius/radius/pkg/version"
+	"github.com/go-logr/logr"
 )
 
 type ServerOptions struct {
@@ -40,8 +41,11 @@ func NewServer(ctx context.Context, options ServerOptions, metricsProviderConfig
 
 	//setup metrics handler
 	promExporter, _ := mp.RegisterPrometheusMetrics()
+	logger := logr.FromContextOrDiscard(ctx)
+	logger.Info("Initializing prometheus exporter")
 	r.Use(middleware.MetricsInterceptor)
 	r.Path(metricsProviderConfig.MetricsClientProviderOptions.Endpoint).HandlerFunc(promExporter.ServeHTTP)
+	logger.Info("Initialized prometheus exporter")
 
 	server := &http.Server{
 		Addr:    options.Address,
