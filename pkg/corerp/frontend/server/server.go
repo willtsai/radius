@@ -40,9 +40,12 @@ func NewServer(ctx context.Context, options ServerOptions, metricsProviderConfig
 	r.Path("/healthz").Methods(http.MethodGet).HandlerFunc(reportVersion).Name("healthzAPI")
 
 	//setup metrics handler
-	promExporter, _ := mp.RegisterPrometheusMetrics()
 	logger := logr.FromContextOrDiscard(ctx)
 	logger.Info("Initializing prometheus exporter")
+	promExporter, err := mp.RegisterPrometheusMetrics()
+	if err != nil {
+		logger.Info("error in prometheus init")
+	}
 	r.Use(middleware.MetricsInterceptor)
 	r.Path(metricsProviderConfig.MetricsClientProviderOptions.Endpoint).HandlerFunc(promExporter.ServeHTTP)
 	logger.Info("Initialized prometheus exporter")
