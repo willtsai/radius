@@ -47,7 +47,7 @@ func NewServer(ctx context.Context, options ServerOptions, metricsProviderConfig
 		logger.Info("error in prometheus init")
 	}
 	r.Use(middleware.MetricsInterceptor)
-	r.Path(metricsProviderConfig.MetricsClientProviderOptions.Endpoint).HandlerFunc(promExporter.ServeHTTP)
+	r.Path("/metrics").HandlerFunc(promExporter.ServeHTTP)
 	logger.Info("Initialized prometheus exporter")
 
 	server := &http.Server{
