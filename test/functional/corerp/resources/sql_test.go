@@ -14,8 +14,6 @@ import (
 )
 
 func Test_SQL(t *testing.T) {
-	t.Skip()
-
 	template := "testdata/corerp-resources-sql.bicep"
 	name := "corerp-resources-sql"
 
@@ -51,11 +49,10 @@ func Test_SQL(t *testing.T) {
 					name: {
 						validation.NewK8sPodForResource(name, "corerp-resources-sql-webapp"),
 						validation.NewK8sPodForResource(name, "corerp-resources-sql-container"),
-						validation.NewK8sHTTPProxyForResource(name, "corerp-resources-sql-route"),
+						validation.NewK8sServiceForResource(name, "corerp-resources-sql-route"),
 					},
 				},
 			},
-			SkipObjectValidation: true,
 		},
 	})
 
