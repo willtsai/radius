@@ -13,13 +13,14 @@
     },
     "properties": {
         "status": {
-          "outputResources": [{
-            "LocalID": "Deployment",
-            "ResourceType": {
-              "Type": "Secret",
-              "Provider": "kubernetes"
-            }
-          }]
+            "outputResources": [{
+                "LocalID": "DaprComponent",
+                "Dependencies": null,
+                "ResourceType": {
+                  "type": "dapr.io.component",
+                  "provider": "kubernetes"
+                }
+            }]
         },
         "provisioningState": "Succeeded",
         "environment": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/radius-test-rg/providers/Applications.Core/environments/env0",

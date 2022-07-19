@@ -120,17 +120,13 @@ func CreateRestRoundTripper(context string, group string, overrideURL string) (h
 	return NewLocationRewriteRoundTripper(merged.Host, client), err
 }
 
-func CreateAPIServerConnection(context string, overrideURL string, enableUCP bool) (string, *arm.Connection, error) {
+func CreateAPIServerConnection(context string, overrideURL string) (string, *arm.Connection, error) {
 
 	var baseURL string
 	var err error
 	var roundTripper http.RoundTripper
 
-	if enableUCP {
-		baseURL, roundTripper, err = GetBaseUrlAndRoundTripper(overrideURL, "api.ucp.dev", context, enableUCP)
-	} else {
-		baseURL, roundTripper, err = GetBaseUrlAndRoundTripper(overrideURL, "api.radius.dev", context, enableUCP)
-	}
+	baseURL, roundTripper, err = GetBaseUrlAndRoundTripper(overrideURL, "api.ucp.dev", context)
 	if err != nil {
 		return "", nil, err
 	}
@@ -145,19 +141,12 @@ func GetBaseUrlForDeploymentEngine(overrideURL string) string {
 	return strings.TrimSuffix(overrideURL, "/") + UCPAPIServerBasePath
 }
 
-func GetBaseUrlAndRoundTripperForDeploymentEngine(deploymentEngineURL string, ucpURL string, context string, enableUCP bool) (string, http.RoundTripper, error) {
+func GetBaseUrlAndRoundTripperForDeploymentEngine(ucpURL string, context string) (string, http.RoundTripper, error) {
 	var baseURL string
 	var roundTripper http.RoundTripper
-	var basePath string
-	if enableUCP {
-		basePath = UCPAPIServerBasePath
-	} else {
-		basePath = DeploymentEngineBasePath
-	}
-	if deploymentEngineURL != "" {
-		baseURL = strings.TrimSuffix(deploymentEngineURL, "/") + basePath
-		roundTripper = NewLocationRewriteRoundTripper(deploymentEngineURL, http.DefaultTransport)
-	} else if ucpURL != "" {
+	basePath := UCPAPIServerBasePath
+
+	if ucpURL != "" {
 		baseURL = strings.TrimSuffix(ucpURL, "/") + basePath
 		roundTripper = NewLocationRewriteRoundTripper(ucpURL, http.DefaultTransport)
 	} else {
@@ -166,14 +155,9 @@ func GetBaseUrlAndRoundTripperForDeploymentEngine(deploymentEngineURL string, uc
 			return "", nil, err
 		}
 
-		var k8sType string
-		if enableUCP {
-			k8sType = UCPType
-		} else {
-			k8sType = BicepType
-		}
+		k8sType := UCPType
 
-		roundTripper, err = CreateRestRoundTripper(context, k8sType, deploymentEngineURL)
+		roundTripper, err = CreateRestRoundTripper(context, k8sType, ucpURL)
 		if err != nil {
 			return "", nil, err
 		}
@@ -184,15 +168,11 @@ func GetBaseUrlAndRoundTripperForDeploymentEngine(deploymentEngineURL string, uc
 	return baseURL, roundTripper, nil
 }
 
-func GetBaseUrlAndRoundTripper(overrideURL string, group string, context string, enableUCP bool) (string, http.RoundTripper, error) {
+func GetBaseUrlAndRoundTripper(overrideURL string, group string, context string) (string, http.RoundTripper, error) {
 	var baseURL string
 	var roundTripper http.RoundTripper
 	if overrideURL != "" {
-		if enableUCP {
-			baseURL = strings.TrimSuffix(overrideURL, "/") + UCPAPIServerBasePath
-		} else {
-			baseURL = strings.TrimSuffix(overrideURL, "/") + LegacyAPIServerBasePath
-		}
+		baseURL = strings.TrimSuffix(overrideURL, "/") + UCPAPIServerBasePath
 		roundTripper = NewLocationRewriteRoundTripper(overrideURL, http.DefaultTransport)
 	} else {
 		restConfig, err := GetConfig(context)
@@ -203,11 +183,7 @@ func GetBaseUrlAndRoundTripper(overrideURL string, group string, context string,
 		if err != nil {
 			return "", nil, err
 		}
-		if enableUCP {
-			baseURL = strings.TrimSuffix(restConfig.Host+restConfig.APIPath, "/") + UCPAPIServerBasePath
-		} else {
-			baseURL = strings.TrimSuffix(restConfig.Host+restConfig.APIPath, "/") + LegacyAPIServerBasePath
-		}
+		baseURL = strings.TrimSuffix(restConfig.Host+restConfig.APIPath, "/") + UCPAPIServerBasePath
 		roundTripper = NewLocationRewriteRoundTripper(restConfig.Host, roundTripper)
 	}
 	return baseURL, roundTripper, nil
@@ -258,7 +234,6 @@ func CreateRuntimeClient(context string, scheme *runtime.Scheme) (client.Client,
 
 	var c client.Client
 	for i := 0; i < 2; i++ {
-		output.LogInfo("Attempting to get a kubernetes client...")
 		c, err = client.New(merged, client.Options{Scheme: scheme})
 		if err != nil {
 			output.LogInfo(fmt.Errorf("failed to get a kubernetes client: %w", err).Error())

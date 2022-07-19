@@ -11,7 +11,6 @@ import (
 	"net/http"
 
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/connectorrp/datamodel"
@@ -28,8 +27,8 @@ type CreateOrUpdateDaprInvokeHttpRoute struct {
 }
 
 // NewCreateOrUpdateDaprInvokeHttpRoute creates a new instance of CreateOrUpdateDaprInvokeHttpRoute.
-func NewCreateOrUpdateDaprInvokeHttpRoute(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &CreateOrUpdateDaprInvokeHttpRoute{ctrl.NewBaseController(ds, sm)}, nil
+func NewCreateOrUpdateDaprInvokeHttpRoute(opts ctrl.Options) (ctrl.Controller, error) {
+	return &CreateOrUpdateDaprInvokeHttpRoute{ctrl.NewBaseController(opts)}, nil
 }
 
 // Run executes CreateOrUpdateDaprInvokeHttpRoute operation.
@@ -40,8 +39,18 @@ func (daprHttpRoute *CreateOrUpdateDaprInvokeHttpRoute) Run(ctx context.Context,
 		return nil, err
 	}
 
-	// TODO Integrate with renderer/deployment processor to validate associated resource existence (if fromResource is defined)
-	// and store resource properties and secrets reference
+	rendererOutput, err := daprHttpRoute.DeploymentProcessor().Render(ctx, serviceCtx.ResourceID, newResource)
+	if err != nil {
+		return nil, err
+	}
+	deploymentOutput, err := daprHttpRoute.DeploymentProcessor().Deploy(ctx, serviceCtx.ResourceID, rendererOutput)
+	if err != nil {
+		return nil, err
+	}
+
+	newResource.Properties.BasicResourceProperties.Status.OutputResources = deploymentOutput.Resources
+	newResource.InternalMetadata.ComputedValues = deploymentOutput.ComputedValues
+	newResource.InternalMetadata.SecretValues = deploymentOutput.SecretValues
 
 	// Read existing resource info from the data store
 	existingResource := &datamodel.DaprInvokeHttpRoute{}

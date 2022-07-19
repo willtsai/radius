@@ -10,7 +10,6 @@ import (
 	"net/http"
 
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/connectorrp/datamodel"
@@ -28,8 +27,8 @@ type ListRabbitMQMessageQueues struct {
 }
 
 // NewListRabbitMQMessageQueues creates a new instance of ListRabbitMQMessageQueues.
-func NewListRabbitMQMessageQueues(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &ListRabbitMQMessageQueues{ctrl.NewBaseController(ds, sm)}, nil
+func NewListRabbitMQMessageQueues(opts ctrl.Options) (ctrl.Controller, error) {
+	return &ListRabbitMQMessageQueues{ctrl.NewBaseController(opts)}, nil
 }
 
 func (rabbitmq *ListRabbitMQMessageQueues) Run(ctx context.Context, req *http.Request) (rest.Response, error) {
@@ -40,7 +39,7 @@ func (rabbitmq *ListRabbitMQMessageQueues) Run(ctx context.Context, req *http.Re
 		ResourceType: serviceCtx.ResourceID.Type(),
 	}
 
-	result, err := rabbitmq.DataStore.Query(ctx, query, store.WithPaginationToken(serviceCtx.SkipToken), store.WithMaxQueryItemCount(serviceCtx.Top))
+	result, err := rabbitmq.StorageClient().Query(ctx, query, store.WithPaginationToken(serviceCtx.SkipToken), store.WithMaxQueryItemCount(serviceCtx.Top))
 	if err != nil {
 		return nil, err
 	}

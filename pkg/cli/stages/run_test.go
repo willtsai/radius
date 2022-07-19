@@ -7,6 +7,7 @@ package stages
 
 import (
 	"context"
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path"
@@ -18,18 +19,19 @@ import (
 
 	"github.com/project-radius/radius/pkg/cli/builders"
 	"github.com/project-radius/radius/pkg/cli/clients"
-	"github.com/project-radius/radius/pkg/cli/environments"
+	"github.com/project-radius/radius/pkg/cli/connections"
 	"github.com/project-radius/radius/pkg/cli/radyaml"
+	"github.com/project-radius/radius/pkg/cli/workspaces"
 	"github.com/project-radius/radius/test"
 )
 
-func SkipBicepBuild(ctx context.Context, deployFile string) (string, error) {
+func SkipBicepBuild(ctx context.Context, deployFile string) (map[string]interface{}, error) {
 	// We don't want to run bicep in unit tests. It's fine because we're not going to
 	// look at the output of this.
-	return "", nil
+	return nil, nil
 }
 
-func MockBicepBuild(ctx context.Context, deployFile string, template string) (string, error) {
+func MockBicepBuild(ctx context.Context, deployFile string, template map[string]interface{}) (map[string]interface{}, error) {
 	// Mock the bicep build with the supplied template data
 	// Template data should be the result of building the
 	// stage bicep file.
@@ -47,7 +49,6 @@ func Test_EmptyRadYaml_DoesNotCrash(t *testing.T) {
 
 	tempDir := t.TempDir()
 	options := Options{
-		Environment:    &MockEnvironment{},
 		BaseDirectory:  tempDir,
 		Manifest:       manifest,
 		FinalStage:     "",
@@ -70,7 +71,6 @@ func Test_MissingStage_ReturnsError(t *testing.T) {
 
 	tempDir := t.TempDir()
 	options := Options{
-		Environment:    &MockEnvironment{},
 		BaseDirectory:  tempDir,
 		Manifest:       manifest,
 		FinalStage:     "missing",
@@ -98,7 +98,6 @@ func Test_CanSkipStageWithNothingToDo(t *testing.T) {
 
 	tempDir := t.TempDir()
 	options := Options{
-		Environment:    &MockEnvironment{},
 		BaseDirectory:  tempDir,
 		Manifest:       manifest,
 		FinalStage:     "",
@@ -139,7 +138,6 @@ func Test_CanRunAllStages(t *testing.T) {
 
 	tempDir := t.TempDir()
 	options := Options{
-		Environment:    &MockEnvironment{},
 		BaseDirectory:  tempDir,
 		Manifest:       manifest,
 		FinalStage:     "",
@@ -190,7 +188,6 @@ func Test_CanSpecifyLastStage(t *testing.T) {
 
 	tempDir := t.TempDir()
 	options := Options{
-		Environment:    &MockEnvironment{},
 		BaseDirectory:  tempDir,
 		Manifest:       manifest,
 		FinalStage:     "third",
@@ -241,7 +238,6 @@ func Test_CanSpecifyStage(t *testing.T) {
 
 	tempDir := t.TempDir()
 	options := Options{
-		Environment:    &MockEnvironment{},
 		BaseDirectory:  tempDir,
 		Manifest:       manifest,
 		FinalStage:     "second",
@@ -299,7 +295,7 @@ func Test_CanPropagateParameters(t *testing.T) {
 	require.NoError(t, err)
 
 	options := Options{
-		Environment: &MockEnvironment{
+		ConnectionFactory: &MockConnectionFactory{
 			DeploymentClient: &MockDeploymentClient{
 				Results: []clients.DeploymentResult{
 					{
@@ -417,7 +413,7 @@ func Test_CanUsePerStageParameters(t *testing.T) {
 	require.NoError(t, err)
 
 	options := Options{
-		Environment: &MockEnvironment{
+		ConnectionFactory: &MockConnectionFactory{
 			DeploymentClient: &MockDeploymentClient{
 				Results: []clients.DeploymentResult{
 					{
@@ -530,7 +526,7 @@ func Test_CanOverrideStage(t *testing.T) {
 	require.NoError(t, err)
 
 	options := Options{
-		Environment: &MockEnvironment{
+		ConnectionFactory: &MockConnectionFactory{
 			DeploymentClient: &MockDeploymentClient{},
 		},
 		BaseDirectory:  tempDir,
@@ -587,7 +583,7 @@ func Test_CanUseDeploymentTemplateParameters(t *testing.T) {
 	require.NoError(t, err)
 
 	options := Options{
-		Environment: &MockEnvironment{
+		ConnectionFactory: &MockConnectionFactory{
 			DeploymentClient: &MockDeploymentClient{
 				Results: []clients.DeploymentResult{
 					{
@@ -607,11 +603,14 @@ func Test_CanUseDeploymentTemplateParameters(t *testing.T) {
 				"value": "value2",
 			},
 		},
-		BicepBuildFunc: func(ctx context.Context, deployFile string) (string, error) {
+		BicepBuildFunc: func(ctx context.Context, deployFile string) (map[string]interface{}, error) {
 			content, err := ioutil.ReadFile(filepath.Join("testdata", "test-bicep-output.json"))
 			require.NoError(t, err)
+			deploymentOutput := map[string]interface{}{}
 
-			return MockBicepBuild(ctx, deployFile, string(content))
+			_ = json.Unmarshal(content, &deploymentOutput)
+
+			return MockBicepBuild(ctx, deployFile, deploymentOutput)
 		},
 	}
 
@@ -677,7 +676,7 @@ func Test_CanUseParameterFileParameters(t *testing.T) {
 	require.NoError(t, err)
 
 	options := Options{
-		Environment: &MockEnvironment{
+		ConnectionFactory: &MockConnectionFactory{
 			DeploymentClient: &MockDeploymentClient{
 				Results: []clients.DeploymentResult{
 					{
@@ -728,21 +727,27 @@ func Test_CanUseParameterFileParameters(t *testing.T) {
 	require.Equal(t, expected, results)
 }
 
-var _ environments.DeploymentEnvironment = (*MockEnvironment)(nil)
-var _ environments.DiagnosticsEnvironment = (*MockEnvironment)(nil)
+var _ connections.Factory = (*MockConnectionFactory)(nil)
 
-type MockEnvironment struct {
-	environments.GenericEnvironment
+type MockConnectionFactory struct {
 	DeploymentClient  clients.DeploymentClient
 	DiagnosticsClient clients.DiagnosticsClient
 }
 
-func (e *MockEnvironment) CreateDeploymentClient(ctx context.Context) (clients.DeploymentClient, error) {
-	return e.DeploymentClient, nil
+func (cf *MockConnectionFactory) CreateDeploymentClient(ctx context.Context, workspace workspaces.Workspace) (clients.DeploymentClient, error) {
+	return cf.DeploymentClient, nil
 }
 
-func (e *MockEnvironment) CreateDiagnosticsClient(ctx context.Context) (clients.DiagnosticsClient, error) {
-	return e.DiagnosticsClient, nil
+func (cf *MockConnectionFactory) CreateDiagnosticsClient(ctx context.Context, workspace workspaces.Workspace) (clients.DiagnosticsClient, error) {
+	return cf.DiagnosticsClient, nil
+}
+
+func (cf *MockConnectionFactory) CreateApplicationsManagementClient(ctx context.Context, workspace workspaces.Workspace) (clients.ApplicationsManagementClient, error) {
+	return nil, nil
+}
+
+func (cf *MockConnectionFactory) CreateServerLifecycleClient(ctx context.Context, workspace workspaces.Workspace) (clients.ServerLifecycleClient, error) {
+	return nil, nil
 }
 
 var _ clients.DeploymentClient = (*MockDeploymentClient)(nil)
@@ -822,7 +827,7 @@ func Test_CanUseBuildResults(t *testing.T) {
 	require.NoError(t, err)
 
 	options := Options{
-		Environment: &MockEnvironment{
+		ConnectionFactory: &MockConnectionFactory{
 			DeploymentClient: &MockDeploymentClient{
 				Results: []clients.DeploymentResult{
 					{

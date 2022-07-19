@@ -6,9 +6,9 @@
 package hostoptions
 
 import (
-	qprovider "github.com/project-radius/radius/pkg/queue/provider"
 	"github.com/project-radius/radius/pkg/telemetry/metrics/provider"
 	"github.com/project-radius/radius/pkg/ucp/dataprovider"
+	qprovider "github.com/project-radius/radius/pkg/ucp/queue/provider"
 )
 
 // ProviderConfig includes the resource provider configuration.
@@ -42,4 +42,8 @@ type ServerOptions struct {
 type WorkerServerOptions struct {
 	// Port is the localhost port which provides the system-level info, such as healthprobe and metric port
 	Port *int32 `yaml:"port,omitempty"`
+	// MaxOperationConcurrency is the maximum concurrency to process async request operation.
+	MaxOperationConcurrency *int `yaml:"maxOperationConcurrency,omitempty"`
+	// MaxOperationRetryCount is the maximum retry count to process async request operation.
+	MaxOperationRetryCount *int `yaml:"maxOperationRetryCount,omitempty"`
 }

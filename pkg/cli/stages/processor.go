@@ -21,7 +21,7 @@ import (
 )
 
 func (p *processor) ProcessBuild(ctx context.Context, stage radyaml.BuildStage) error {
-	registry := p.Options.Environment.GetContainerRegistry()
+	registry := p.Options.Workspace.Registry
 
 	// We'll run the build in parallel - each output gets its own output stream.
 	group, ctx := errgroup.WithContext(ctx)
@@ -74,16 +74,16 @@ func (p *processor) ProcessBuild(ctx context.Context, stage radyaml.BuildStage) 
 	return nil
 }
 
-func (p *processor) BuildBicep(ctx context.Context, deployFile string) (string, error) {
+func (p *processor) BuildBicep(ctx context.Context, deployFile string) (map[string]interface{}, error) {
 	err := deploy.ValidateBicepFile(deployFile)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	step := output.BeginStep("Building %s...", deployFile)
 	template, err := bicep.Build(deployFile)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	output.CompleteStep(step)
 	return template, nil
@@ -112,8 +112,8 @@ func (p *processor) ProcessDeploy(ctx context.Context, stage radyaml.BicepStage)
 
 	// Get parameters from parsed stage template
 	parser := bicep.ParameterParser{FileSystem: bicep.OSFileSystem{}}
-	if template != "" {
-		parsedFileContents, err := parser.ParseFileContents([]byte(template))
+	if template != nil {
+		parsedFileContents, err := parser.ParseFileContents(template)
 		if err != nil {
 			return err
 		}
@@ -151,11 +151,12 @@ func (p *processor) ProcessDeploy(ctx context.Context, stage radyaml.BicepStage)
 	completionText := fmt.Sprintf("Deployed stage %s: %d of %d", p.CurrentStage.Name, p.CurrentStage.DisplayIndex, p.CurrentStage.TotalCount)
 
 	result, err := deploy.DeployWithProgress(ctx, deploy.Options{
-		Environment:    p.Environment,
-		Template:       template,
-		Parameters:     parameters,
-		ProgressText:   progressText,
-		CompletionText: completionText,
+		Workspace:         p.Workspace,
+		ConnectionFactory: p.ConnectionFactory,
+		Template:          template,
+		Parameters:        parameters,
+		ProgressText:      progressText,
+		CompletionText:    completionText,
 	})
 	if err != nil {
 		return err

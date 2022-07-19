@@ -10,7 +10,6 @@ import (
 	"errors"
 	"net/http"
 
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/connectorrp/datamodel"
@@ -26,8 +25,8 @@ type DeleteDaprInvokeHttpRoute struct {
 }
 
 // NewDeleteDaprInvokeHttpRoute creates a new instance DeleteDaprInvokeHttpRoute.
-func NewDeleteDaprInvokeHttpRoute(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &DeleteDaprInvokeHttpRoute{ctrl.NewBaseController(ds, sm)}, nil
+func NewDeleteDaprInvokeHttpRoute(opts ctrl.Options) (ctrl.Controller, error) {
+	return &DeleteDaprInvokeHttpRoute{ctrl.NewBaseController(opts)}, nil
 }
 
 func (daprHttpRoute *DeleteDaprInvokeHttpRoute) Run(ctx context.Context, req *http.Request) (rest.Response, error) {
@@ -52,7 +51,12 @@ func (daprHttpRoute *DeleteDaprInvokeHttpRoute) Run(ctx context.Context, req *ht
 		return rest.NewPreconditionFailedResponse(serviceCtx.ResourceID.String(), err.Error()), nil
 	}
 
-	err = daprHttpRoute.DataStore.Delete(ctx, serviceCtx.ResourceID.String())
+	err = daprHttpRoute.DeploymentProcessor().Delete(ctx, serviceCtx.ResourceID, existingResource.Properties.Status.OutputResources)
+	if err != nil {
+		return nil, err
+	}
+
+	err = daprHttpRoute.StorageClient().Delete(ctx, serviceCtx.ResourceID.String())
 	if err != nil {
 		if errors.Is(&store.ErrNotFound{}, err) {
 			return rest.NewNoContentResponse(), nil

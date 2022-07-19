@@ -20,8 +20,8 @@ type ApplicationProperties struct {
 	// REQUIRED; The resource id of the environment linked to application.
 	Environment *string `json:"environment,omitempty"`
 
-	// Provisioning state of the application at the time the operation was called.
-	ProvisioningState *ProvisioningState `json:"provisioningState,omitempty"`
+	// READ-ONLY; Provisioning state of the application at the time the operation was called.
+	ProvisioningState *ProvisioningState `json:"provisioningState,omitempty" azure:"ro"`
 }
 
 // ApplicationResource - Radius Application.
@@ -362,7 +362,7 @@ type DaprSidecarExtension struct {
 // MarshalJSON implements the json.Marshaller interface for type DaprSidecarExtension.
 func (d DaprSidecarExtension) MarshalJSON() ([]byte, error) {
 	objectMap := make(map[string]interface{})
-	d.Extension.marshalInternal(objectMap, "dapr.io/Sidecar@v1alpha1")
+	d.Extension.marshalInternal(objectMap, "daprSidecar")
 	populate(objectMap, "appId", d.AppID)
 	populate(objectMap, "appPort", d.AppPort)
 	populate(objectMap, "config", d.Config)
@@ -406,22 +406,98 @@ func (d *DaprSidecarExtension) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// EnvironmentComputeClassification provides polymorphic access to related types.
+// Call the interface's GetEnvironmentCompute() method to access the common type.
+// Use a type switch to determine the concrete type.  The possible types are:
+// - *EnvironmentCompute, *KubernetesCompute
+type EnvironmentComputeClassification interface {
+	// GetEnvironmentCompute returns the EnvironmentCompute content of the underlying type.
+	GetEnvironmentCompute() *EnvironmentCompute
+}
+
 // EnvironmentCompute - Compute resource used by application environment resource.
 type EnvironmentCompute struct {
 	// REQUIRED; Type of compute resource.
-	Kind *EnvironmentComputeKind `json:"kind,omitempty"`
+	Kind *string `json:"kind,omitempty"`
 
 	// The resource id of the compute resource for application environment.
 	ResourceID *string `json:"resourceId,omitempty"`
 }
 
+// GetEnvironmentCompute implements the EnvironmentComputeClassification interface for type EnvironmentCompute.
+func (e *EnvironmentCompute) GetEnvironmentCompute() *EnvironmentCompute { return e }
+
+// UnmarshalJSON implements the json.Unmarshaller interface for type EnvironmentCompute.
+func (e *EnvironmentCompute) UnmarshalJSON(data []byte) error {
+	var rawMsg map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawMsg); err != nil {
+		return err
+	}
+	return e.unmarshalInternal(rawMsg)
+}
+
+func (e EnvironmentCompute) marshalInternal(objectMap map[string]interface{}, discValue string) {
+	e.Kind = &discValue
+	objectMap["kind"] = e.Kind
+	populate(objectMap, "resourceId", e.ResourceID)
+}
+
+func (e *EnvironmentCompute) unmarshalInternal(rawMsg map[string]json.RawMessage) error {
+	for key, val := range rawMsg {
+		var err error
+		switch key {
+		case "kind":
+				err = unpopulate(val, &e.Kind)
+				delete(rawMsg, key)
+		case "resourceId":
+				err = unpopulate(val, &e.ResourceID)
+				delete(rawMsg, key)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // EnvironmentProperties - Application environment properties
 type EnvironmentProperties struct {
-	// REQUIRED; The compute resource used by application environment.
-	Compute *EnvironmentCompute `json:"compute,omitempty"`
+	// REQUIRED; Compute resource used by application environment resource.
+	Compute EnvironmentComputeClassification `json:"compute,omitempty"`
 
-	// Provisioning state of the environment at the time the operation was called.
-	ProvisioningState *ProvisioningState `json:"provisioningState,omitempty"`
+	// READ-ONLY; Provisioning state of the environment at the time the operation was called.
+	ProvisioningState *ProvisioningState `json:"provisioningState,omitempty" azure:"ro"`
+}
+
+// MarshalJSON implements the json.Marshaller interface for type EnvironmentProperties.
+func (e EnvironmentProperties) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	populate(objectMap, "compute", e.Compute)
+	populate(objectMap, "provisioningState", e.ProvisioningState)
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON implements the json.Unmarshaller interface for type EnvironmentProperties.
+func (e *EnvironmentProperties) UnmarshalJSON(data []byte) error {
+	var rawMsg map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawMsg); err != nil {
+		return err
+	}
+	for key, val := range rawMsg {
+		var err error
+		switch key {
+		case "compute":
+				e.Compute, err = unmarshalEnvironmentComputeClassification(val)
+				delete(rawMsg, key)
+		case "provisioningState":
+				err = unpopulate(val, &e.ProvisioningState)
+				delete(rawMsg, key)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // EnvironmentResource - Application environment.
@@ -667,17 +743,17 @@ type GatewayProperties struct {
 	// REQUIRED; The resource id of the application linked to Gateway resource.
 	Application *string `json:"application,omitempty"`
 
+	// REQUIRED; Routes attached to this Gateway
+	Routes []*GatewayRoute `json:"routes,omitempty"`
+
 	// Declare hostname information for the Gateway. Leaving the hostname empty auto-assigns one: mygateway.myapp.PUBLICHOSTNAMEORIP.nip.io.
 	Hostname *GatewayPropertiesHostname `json:"hostname,omitempty"`
 
 	// Sets Gateway to not be exposed externally (no public IP address associated). Defaults to false (exposed to internet).
 	Internal *bool `json:"internal,omitempty"`
 
-	// Provisioning state of the Gateway at the time the operation was called.
-	ProvisioningState *ProvisioningState `json:"provisioningState,omitempty"`
-
-	// Routes attached to this Gateway
-	Routes []*GatewayRoute `json:"routes,omitempty"`
+	// READ-ONLY; Provisioning state of the Gateway at the time the operation was called.
+	ProvisioningState *ProvisioningState `json:"provisioningState,omitempty" azure:"ro"`
 }
 
 // MarshalJSON implements the json.Marshaller interface for type GatewayProperties.
@@ -874,14 +950,14 @@ type HTTPRouteProperties struct {
 	// The port number for the HTTP Route. Defaults to 80. Readonly.
 	Port *int32 `json:"port,omitempty"`
 
-	// Provisioning state of the HTTP Route at the time the operation was called.
-	ProvisioningState *ProvisioningState `json:"provisioningState,omitempty"`
-
 	// The scheme used for traffic. Readonly.
 	Scheme *string `json:"scheme,omitempty"`
 
 	// A stable URL that that can be used to route traffic to a resource. Readonly.
 	URL *string `json:"url,omitempty"`
+
+	// READ-ONLY; Provisioning state of the HTTP Route at the time the operation was called.
+	ProvisioningState *ProvisioningState `json:"provisioningState,omitempty" azure:"ro"`
 }
 
 // MarshalJSON implements the json.Marshaller interface for type HTTPRouteProperties.
@@ -1080,6 +1156,44 @@ func (i IamProperties) MarshalJSON() ([]byte, error) {
 	return json.Marshal(objectMap)
 }
 
+// KubernetesCompute - Specifies the properties for Kubernetes compute environment
+type KubernetesCompute struct {
+	EnvironmentCompute
+	// REQUIRED; The namespace to use for the environment.
+	Namespace *string `json:"namespace,omitempty"`
+}
+
+// MarshalJSON implements the json.Marshaller interface for type KubernetesCompute.
+func (k KubernetesCompute) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	k.EnvironmentCompute.marshalInternal(objectMap, "kubernetes")
+	populate(objectMap, "namespace", k.Namespace)
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON implements the json.Unmarshaller interface for type KubernetesCompute.
+func (k *KubernetesCompute) UnmarshalJSON(data []byte) error {
+	var rawMsg map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawMsg); err != nil {
+		return err
+	}
+	for key, val := range rawMsg {
+		var err error
+		switch key {
+		case "namespace":
+				err = unpopulate(val, &k.Namespace)
+				delete(rawMsg, key)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if err := k.EnvironmentCompute.unmarshalInternal(rawMsg); err != nil {
+		return err
+	}
+	return nil
+}
+
 // ManualScalingExtension - ManualScaling Extension
 type ManualScalingExtension struct {
 	Extension
@@ -1090,7 +1204,7 @@ type ManualScalingExtension struct {
 // MarshalJSON implements the json.Marshaller interface for type ManualScalingExtension.
 func (m ManualScalingExtension) MarshalJSON() ([]byte, error) {
 	objectMap := make(map[string]interface{})
-	m.Extension.marshalInternal(objectMap, "Applications.Core/ManualScaling@v1alpha1")
+	m.Extension.marshalInternal(objectMap, "manualScaling")
 	populate(objectMap, "replicas", m.Replicas)
 	return json.Marshal(objectMap)
 }

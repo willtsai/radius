@@ -10,7 +10,6 @@ import (
 	"net/http"
 
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/connectorrp/datamodel"
@@ -28,8 +27,8 @@ type ListExtenders struct {
 }
 
 // NewListExtenders creates a new instance of ListExtenders.
-func NewListExtenders(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &ListExtenders{ctrl.NewBaseController(ds, sm)}, nil
+func NewListExtenders(opts ctrl.Options) (ctrl.Controller, error) {
+	return &ListExtenders{ctrl.NewBaseController(opts)}, nil
 }
 
 func (extender *ListExtenders) Run(ctx context.Context, req *http.Request) (rest.Response, error) {
@@ -40,7 +39,7 @@ func (extender *ListExtenders) Run(ctx context.Context, req *http.Request) (rest
 		ResourceType: serviceCtx.ResourceID.Type(),
 	}
 
-	result, err := extender.DataStore.Query(ctx, query, store.WithPaginationToken(serviceCtx.SkipToken), store.WithMaxQueryItemCount(serviceCtx.Top))
+	result, err := extender.StorageClient().Query(ctx, query, store.WithPaginationToken(serviceCtx.SkipToken), store.WithMaxQueryItemCount(serviceCtx.Top))
 	if err != nil {
 		return nil, err
 	}

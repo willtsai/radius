@@ -12,25 +12,37 @@ import (
 	"github.com/project-radius/radius/pkg/armrpc/api/conv"
 	"github.com/project-radius/radius/pkg/radrp/outputresource"
 	"github.com/project-radius/radius/pkg/resourcemodel"
+	"github.com/project-radius/radius/pkg/rp"
+	"github.com/project-radius/radius/pkg/ucp/resources"
 )
 
 const (
 	ConnectionStringValue = "connectionString"
 	DatabaseNameValue     = "database"
+	ServerNameValue       = "server"
 	UsernameStringValue   = "username"
 	PasswordStringHolder  = "password"
+	Host                  = "host"
+	Port                  = "port"
 )
 
 var ErrorResourceOrServerNameMissingFromResource = errors.New("either the 'resource' or 'server'/'database' is required")
 
+var ErrResourceMissingForResource = errors.New("the 'resource' field is required")
+
+//go:generate mockgen -destination=./mock_renderer.go -package=renderers github.com/project-radius/radius/pkg/connectorrp/renderers Renderer
 type Renderer interface {
-	Render(ctx context.Context, resource conv.DataModelInterface) (RendererOutput, error)
+	Render(ctx context.Context, resource conv.DataModelInterface, options RenderOptions) (RendererOutput, error)
+}
+
+type RenderOptions struct {
+	Namespace string
 }
 
 type RendererOutput struct {
 	Resources      []outputresource.OutputResource
 	ComputedValues map[string]ComputedValueReference
-	SecretValues   map[string]SecretValueReference
+	SecretValues   map[string]rp.SecretValueReference
 }
 
 // ComputedValueReference represents a non-secret value that can accessed once the output resources
@@ -60,32 +72,19 @@ type ComputedValueReference struct {
 	JSONPointer string
 }
 
-// SecretValueReference represents a secret value that can accessed on the output resources
-// have been deployed.
-type SecretValueReference struct {
-	// SecretValueReference always needs to be resolved against a deployed resource. These
-	// are secrets so we don't want to store them.
+// Represents a dependency of the resource currently being rendered. Currently dependencies are always Radius resources.
+type RendererDependency struct {
+	// ResourceID is the resource ID of the Radius resource that is the dependency.
+	ResourceID resources.ID
 
-	// LocalID is used to resolve the 'target' output resource for retrieving the secret value.
-	LocalID string
+	// Definition is the definition (`properties` node) of the dependency.
+	Definition map[string]interface{}
 
-	// Action refers to a named custom action used to fetch the secret value. Maybe be empty in the case of Kubernetes since there's
-	// no concept of 'action'. Will always be set for an ARM resource.
-	Action string
+	// ComputedValues is a map of the computed values and secrets of the dependency.
+	ComputedValues map[string]interface{}
 
-	// ValueSelector is a JSONPointer used to resolve the secret value.
-	ValueSelector string
-
-	// Transformer is a reference to a SecretValueTransformer that can be looked up by name.
-	// By-convention this is the Resource Type of the resource (eg: Microsoft.DocumentDB/databaseAccounts).
-	// If there are multiple kinds of transformers per Resource Type, then add a unique suffix.
-	//
-	// NOTE: the transformer is a string key because it has to round-trip from
-	// the database. We don't store the secret value, so we have to be able to process it later.
-	Transformer resourcemodel.ResourceType
-
-	// Value is the secret value itself
-	Value string
+	// OutputResources is a map of the output resource identities of the dependency. The map is keyed on the LocalID of the output resource.
+	OutputResources map[string]resourcemodel.ResourceIdentity
 }
 
 // SecretValueTransformer allows transforming a secret value before passing it on to a Resource
@@ -96,10 +95,10 @@ type SecretValueReference struct {
 // string that application code consumes will include a database name or queue name, etc. Or the different
 // libraries involved might support different connection string formats, and the user has to choose on.
 type SecretValueTransformer interface {
-	Transform(ctx context.Context, resource conv.DataModelInterface, value interface{}) (interface{}, error)
+	Transform(ctx context.Context, dependency RendererDependency, value interface{}) (interface{}, error)
 }
 
-//go:generate mockgen -destination=./mock_secretvalueclient.go -package=renderers -self_package github.com/project-radius/radius/pkg/renderers github.com/project-radius/radius/pkg/renderers SecretValueClient
+//go:generate mockgen -destination=./mock_secretvalueclient.go -package=renderers -self_package github.com/project-radius/radius/pkg/connectorrp/renderers github.com/project-radius/radius/pkg/connectorrp/renderers SecretValueClient
 type SecretValueClient interface {
 	FetchSecret(ctx context.Context, identity resourcemodel.ResourceIdentity, action string, valueSelector string) (interface{}, error)
 }

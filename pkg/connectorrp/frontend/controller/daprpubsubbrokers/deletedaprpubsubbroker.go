@@ -10,7 +10,6 @@ import (
 	"errors"
 	"net/http"
 
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/connectorrp/datamodel"
@@ -26,8 +25,8 @@ type DeleteDaprPubSubBroker struct {
 }
 
 // NewDeleteDaprPubSubBroker creates a new instance DeleteDaprPubSubBroker.
-func NewDeleteDaprPubSubBroker(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &DeleteDaprPubSubBroker{ctrl.NewBaseController(ds, sm)}, nil
+func NewDeleteDaprPubSubBroker(opts ctrl.Options) (ctrl.Controller, error) {
+	return &DeleteDaprPubSubBroker{ctrl.NewBaseController(opts)}, nil
 }
 
 func (daprPubSub *DeleteDaprPubSubBroker) Run(ctx context.Context, req *http.Request) (rest.Response, error) {
@@ -52,7 +51,11 @@ func (daprPubSub *DeleteDaprPubSubBroker) Run(ctx context.Context, req *http.Req
 		return rest.NewPreconditionFailedResponse(serviceCtx.ResourceID.String(), err.Error()), nil
 	}
 
-	err = daprPubSub.DataStore.Delete(ctx, serviceCtx.ResourceID.String())
+	err = daprPubSub.DeploymentProcessor().Delete(ctx, serviceCtx.ResourceID, existingResource.Properties.Status.OutputResources)
+	if err != nil {
+		return nil, err
+	}
+	err = daprPubSub.StorageClient().Delete(ctx, serviceCtx.ResourceID.String())
 	if err != nil {
 		if errors.Is(&store.ErrNotFound{}, err) {
 			return rest.NewNoContentResponse(), nil

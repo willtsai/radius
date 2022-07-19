@@ -12,7 +12,6 @@ import (
 	"time"
 
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/corerp/datamodel"
@@ -34,8 +33,8 @@ type DeleteContainer struct {
 }
 
 // NewDeleteContainer creates a new DeleteContainer.
-func NewDeleteContainer(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &DeleteContainer{ctrl.NewBaseController(ds, sm)}, nil
+func NewDeleteContainer(opts ctrl.Options) (ctrl.Controller, error) {
+	return &DeleteContainer{ctrl.NewBaseController(opts)}, nil
 }
 
 func (dc *DeleteContainer) Run(ctx context.Context, req *http.Request) (rest.Response, error) {
@@ -60,7 +59,7 @@ func (dc *DeleteContainer) Run(ctx context.Context, req *http.Request) (rest.Res
 		return rest.NewPreconditionFailedResponse(serviceCtx.ResourceID.String(), err.Error()), nil
 	}
 
-	err = dc.AsyncOperation.QueueAsyncOperation(ctx, serviceCtx, AsyncDeleteContainerOperationTimeout)
+	err = dc.StatusManager().QueueAsyncOperation(ctx, serviceCtx, AsyncDeleteContainerOperationTimeout)
 	if err != nil {
 		existingContainer.Properties.ProvisioningState = v1.ProvisioningStateFailed
 		_, rbErr := dc.SaveResource(ctx, serviceCtx.ResourceID.String(), existingContainer, etag)
@@ -73,5 +72,5 @@ func (dc *DeleteContainer) Run(ctx context.Context, req *http.Request) (rest.Res
 	existingContainer.Properties.ProvisioningState = v1.ProvisioningStateDeleting
 
 	return rest.NewAsyncOperationResponse(existingContainer, existingContainer.TrackedResource.Location, http.StatusAccepted,
-		serviceCtx.ResourceID, serviceCtx.OperationID), nil
+		serviceCtx.ResourceID, serviceCtx.OperationID, serviceCtx.APIVersion), nil
 }

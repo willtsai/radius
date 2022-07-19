@@ -25,8 +25,8 @@ type GetOperationStatus struct {
 }
 
 // NewGetOperationStatus creates a new GetOperationStatus.
-func NewGetOperationStatus(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &GetOperationStatus{ctrl.NewBaseController(ds, sm)}, nil
+func NewGetOperationStatus(opts ctrl.Options) (ctrl.Controller, error) {
+	return &GetOperationStatus{ctrl.NewBaseController(opts)}, nil
 }
 
 // Run returns the async operation status.

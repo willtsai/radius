@@ -16,9 +16,10 @@ import (
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/asyncoperation/controller"
 	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
-	"github.com/project-radius/radius/pkg/queue"
-	"github.com/project-radius/radius/pkg/queue/inmemory"
+	"github.com/project-radius/radius/pkg/corerp/backend/deployment"
 	"github.com/project-radius/radius/pkg/ucp/dataprovider"
+	queue "github.com/project-radius/radius/pkg/ucp/queue/client"
+	"github.com/project-radius/radius/pkg/ucp/queue/inmemory"
 	"github.com/project-radius/radius/pkg/ucp/store"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -46,6 +47,7 @@ var (
 		HomeTenantID:     "test-home-tenant-id",
 		ClientObjectID:   "test-client-object-id",
 	}
+	defaultTestLockTime = defaultMinMessageLockDuration * 2
 )
 
 type testAsyncController struct {
@@ -88,9 +90,9 @@ func (c *testContext) cancellable(timeout time.Duration) (context.Context, conte
 	}
 }
 
-func newTestContext(t *testing.T) (*testContext, *gomock.Controller) {
+func newTestContext(t *testing.T, lockTime time.Duration) (*testContext, *gomock.Controller) {
 	mctrl := gomock.NewController(t)
-	inmemQ := inmemory.NewInMemQueue(5 * time.Minute)
+	inmemQ := inmemory.NewInMemQueue(lockTime)
 	return &testContext{
 		ctx:       context.Background(),
 		mockSC:    store.NewMockStorageClient(mctrl),
@@ -101,48 +103,47 @@ func newTestContext(t *testing.T) (*testContext, *gomock.Controller) {
 	}, mctrl
 }
 
-func genTestMessage(opID uuid.UUID, opTimeout time.Duration) (*queue.Message, *atomic.Int32, *atomic.Int32) {
-	finished := atomic.NewInt32(0)
-	extended := atomic.NewInt32(0)
+func genTestMessage(opID uuid.UUID, opTimeout time.Duration) *queue.Message {
+	testMessage := queue.NewMessage(&ctrl.Request{
+		OperationID:   opID,
+		OperationType: "APPLICATIONS.CORE/ENVIRONMENTS|PUT",
+		ResourceID: fmt.Sprintf("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/radius-test-rg/providers/Applications.Core/environments/%s",
+			uuid.NewString()),
+		CorrelationID:    uuid.NewString(),
+		OperationTimeout: &opTimeout,
+	})
 
-	testMessage := &queue.Message{
-		Metadata: queue.Metadata{
-			DequeueCount:  0,
-			NextVisibleAt: time.Now().Add(time.Duration(120) * time.Second),
-		},
-		Data: &ctrl.Request{
-			OperationID:   opID,
-			OperationType: "APPLICATIONS.CORE/ENVIRONMENTS|PUT",
-			ResourceID: fmt.Sprintf("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/radius-test-rg/providers/Applications.Core/environments/%s",
-				uuid.NewString()),
-			CorrelationID:    uuid.NewString(),
-			OperationTimeout: &opTimeout,
-		},
+	testMessage.Metadata = queue.Metadata{
+		DequeueCount:  0,
+		NextVisibleAt: time.Now(),
 	}
-	testMessage.WithExtend(func() error {
-		extended.Inc()
-		return nil
-	})
-	testMessage.WithFinish(func(err error) error {
-		finished.Inc()
-		return err
-	})
 
-	return testMessage, finished, extended
+	return testMessage
 }
 
 func TestStart_UnknownOperation(t *testing.T) {
-	tCtx, mctrl := newTestContext(t)
+	tCtx, mctrl := newTestContext(t, defaultTestLockTime)
 	defer mctrl.Finish()
-
-	tCtx.mockSP.EXPECT().GetStorageClient(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 	registry := NewControllerRegistry(tCtx.mockSP)
 	worker := New(Options{}, nil, tCtx.testQueue, registry)
 
+	tCtx.mockSP.EXPECT().
+		GetStorageClient(gomock.Any(), gomock.Any()).
+		Return(tCtx.mockSC, nil).
+		Times(1)
+
+	opts := ctrl.Options{
+		StorageClient: tCtx.mockSC,
+		DataProvider:  tCtx.mockSP,
+		GetDeploymentProcessor: func() deployment.DeploymentProcessor {
+			return deployment.NewMockDeploymentProcessor(mctrl)
+		},
+	}
+
 	called := false
 	testCtrl := &testAsyncController{
-		BaseController: ctrl.NewBaseAsyncController(tCtx.mockSC),
+		BaseController: ctrl.NewBaseAsyncController(opts),
 		fn: func(ctx context.Context) (ctrl.Result, error) {
 			called = true
 			return ctrl.Result{}, nil
@@ -153,9 +154,9 @@ func TestStart_UnknownOperation(t *testing.T) {
 	err := registry.Register(
 		ctx,
 		testResourceType, "UNDEFINED",
-		func(s store.StorageClient) (ctrl.Controller, error) {
+		func(opts ctrl.Options) (ctrl.Controller, error) {
 			return testCtrl, nil
-		})
+		}, opts)
 
 	require.NoError(t, err)
 
@@ -167,7 +168,7 @@ func TestStart_UnknownOperation(t *testing.T) {
 	}()
 
 	// Queue async operation.
-	testMessage, _, _ := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
+	testMessage := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
 	err = tCtx.testQueue.Enqueue(ctx, testMessage)
 	require.NoError(t, err)
 
@@ -182,28 +183,48 @@ func TestStart_UnknownOperation(t *testing.T) {
 }
 
 func TestStart_MaxDequeueCount(t *testing.T) {
-	tCtx, mctrl := newTestContext(t)
+	tCtx, mctrl := newTestContext(t, 1*time.Minute)
 	defer mctrl.Finish()
 
-	tCtx.mockSP.EXPECT().GetStorageClient(gomock.Any(), gomock.Any()).Return(nil, nil)
+	// set up mocks
+	tCtx.mockSC.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(testResourceObject, nil).Times(1)
+	tCtx.mockSC.EXPECT().Save(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+	tCtx.mockSM.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Eq(v1.ProvisioningStateFailed), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+	tCtx.mockSP.EXPECT().GetStorageClient(gomock.Any(), gomock.Any()).Return(store.StorageClient(tCtx.mockSC), nil).Times(1)
+
+	expectedDequeueCount := 2
 
 	registry := NewControllerRegistry(tCtx.mockSP)
-	worker := New(Options{}, nil, tCtx.testQueue, registry)
+	worker := New(Options{MaxOperationRetryCount: expectedDequeueCount}, tCtx.mockSM, tCtx.testQueue, registry)
+
+	opts := ctrl.Options{
+		StorageClient: tCtx.mockSC,
+		DataProvider:  tCtx.mockSP,
+	}
+
+	testCtrl := &testAsyncController{
+		BaseController: ctrl.NewBaseAsyncController(opts),
+		fn: func(ctx context.Context) (ctrl.Result, error) {
+			return ctrl.Result{}, nil
+		},
+	}
 
 	ctx, cancel := tCtx.cancellable(0)
 	err := registry.Register(
 		ctx,
 		testResourceType, v1.OperationPut,
-		func(s store.StorageClient) (ctrl.Controller, error) {
-			return nil, nil
+		func(opts ctrl.Options) (ctrl.Controller, error) {
+			return testCtrl, nil
+		}, ctrl.Options{
+			DataProvider: tCtx.mockSP,
 		})
 	require.NoError(t, err)
 
 	// Queue async operation.
-	testMessage, _, _ := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
+	testMessage := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
 	err = tCtx.testQueue.Enqueue(ctx, testMessage)
 	require.NoError(t, err)
-	testMessage.DequeueCount = MaxDequeueCount
+	testMessage.DequeueCount = expectedDequeueCount + 1
 
 	done := make(chan struct{}, 1)
 	go func() {
@@ -218,11 +239,11 @@ func TestStart_MaxDequeueCount(t *testing.T) {
 	cancel()
 	<-done
 
-	require.Equal(t, MaxDequeueCount+1, testMessage.DequeueCount)
+	require.Equal(t, expectedDequeueCount+2, testMessage.DequeueCount)
 }
 
 func TestStart_MaxConcurrency(t *testing.T) {
-	tCtx, mctrl := newTestContext(t)
+	tCtx, mctrl := newTestContext(t, defaultTestLockTime)
 	defer mctrl.Finish()
 
 	// set up mocks
@@ -235,11 +256,19 @@ func TestStart_MaxConcurrency(t *testing.T) {
 	registry := NewControllerRegistry(tCtx.mockSP)
 	worker := New(Options{}, tCtx.mockSM, tCtx.testQueue, registry)
 
+	opts := ctrl.Options{
+		StorageClient: tCtx.mockSC,
+		DataProvider:  tCtx.mockSP,
+		GetDeploymentProcessor: func() deployment.DeploymentProcessor {
+			return deployment.NewMockDeploymentProcessor(mctrl)
+		},
+	}
+
 	// register test controller.
 	cnt := atomic.NewInt32(0)
 	maxConcurrency := atomic.NewInt32(0)
 	testCtrl := &testAsyncController{
-		BaseController: ctrl.NewBaseAsyncController(tCtx.mockSC),
+		BaseController: ctrl.NewBaseAsyncController(opts),
 		fn: func(ctx context.Context) (ctrl.Result, error) {
 			cnt.Inc()
 			if maxConcurrency.Load() < cnt.Load() {
@@ -255,9 +284,9 @@ func TestStart_MaxConcurrency(t *testing.T) {
 		ctx,
 		testResourceType,
 		v1.OperationPut,
-		func(s store.StorageClient) (ctrl.Controller, error) {
+		func(opts ctrl.Options) (ctrl.Controller, error) {
 			return testCtrl, nil
-		})
+		}, opts)
 	require.NoError(t, err)
 
 	done := make(chan struct{}, 1)
@@ -271,7 +300,7 @@ func TestStart_MaxConcurrency(t *testing.T) {
 	testMessages := []*queue.Message{}
 	// queue asyncoperation messages.
 	for i := 0; i < testMessageCnt; i++ {
-		testMessage, _, _ := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
+		testMessage := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
 		testMessages = append(testMessages, testMessage)
 		err = tCtx.testQueue.Enqueue(ctx, testMessage)
 		require.NoError(t, err)
@@ -286,11 +315,11 @@ func TestStart_MaxConcurrency(t *testing.T) {
 	for i := 0; i < testMessageCnt; i++ {
 		require.Equal(t, 1, testMessages[i].DequeueCount)
 	}
-	require.Equal(t, int32(MaxOperationConcurrency), maxConcurrency.Load())
+	require.Equal(t, int32(defaultMaxOperationConcurrency), maxConcurrency.Load())
 }
 
 func TestStart_RunOperation(t *testing.T) {
-	tCtx, mctrl := newTestContext(t)
+	tCtx, mctrl := newTestContext(t, defaultTestLockTime)
 	defer mctrl.Finish()
 
 	// set up mocks
@@ -303,10 +332,18 @@ func TestStart_RunOperation(t *testing.T) {
 	registry := NewControllerRegistry(tCtx.mockSP)
 	worker := New(Options{}, tCtx.mockSM, tCtx.testQueue, registry)
 
+	opts := ctrl.Options{
+		StorageClient: tCtx.mockSC,
+		DataProvider:  tCtx.mockSP,
+		GetDeploymentProcessor: func() deployment.DeploymentProcessor {
+			return deployment.NewMockDeploymentProcessor(mctrl)
+		},
+	}
+
 	called := make(chan bool, 1)
 	var opCtx context.Context
 	testCtrl := &testAsyncController{
-		BaseController: ctrl.NewBaseAsyncController(tCtx.mockSC),
+		BaseController: ctrl.NewBaseAsyncController(opts),
 		fn: func(ctx context.Context) (ctrl.Result, error) {
 			// operation context will be cancelled after this function is called
 			opCtx = ctx
@@ -319,9 +356,9 @@ func TestStart_RunOperation(t *testing.T) {
 	err := registry.Register(
 		ctx,
 		testResourceType, v1.OperationPut,
-		func(s store.StorageClient) (ctrl.Controller, error) {
+		func(opts ctrl.Options) (ctrl.Controller, error) {
 			return testCtrl, nil
-		})
+		}, opts)
 	require.NoError(t, err)
 
 	done := make(chan struct{}, 1)
@@ -332,7 +369,7 @@ func TestStart_RunOperation(t *testing.T) {
 	}()
 
 	// Queue async operation.
-	testMessage, _, _ := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
+	testMessage := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
 	err = tCtx.testQueue.Enqueue(ctx, testMessage)
 	require.NoError(t, err)
 	<-called
@@ -346,12 +383,12 @@ func TestStart_RunOperation(t *testing.T) {
 	cancel()
 	<-done
 
-	require.Equal(t, 0, tCtx.internalQ.Len())
+	require.Equal(t, 0, tCtx.internalQ.Len(), "message is finished")
 	require.Equal(t, 1, testMessage.DequeueCount)
 }
 
 func TestRunOperation_Successfully(t *testing.T) {
-	tCtx, mctrl := newTestContext(t)
+	tCtx, mctrl := newTestContext(t, defaultTestLockTime)
 	defer mctrl.Finish()
 
 	// set up mocks
@@ -359,21 +396,35 @@ func TestRunOperation_Successfully(t *testing.T) {
 	tCtx.mockSC.EXPECT().Save(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	tCtx.mockSM.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
+	testMessage := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
+	err := tCtx.testQueue.Enqueue(tCtx.ctx, testMessage)
+	require.NoError(t, err)
 	worker := New(Options{}, tCtx.mockSM, tCtx.testQueue, nil)
 
-	testCtrl := &testAsyncController{
-		BaseController: ctrl.NewBaseAsyncController(tCtx.mockSC),
+	opts := ctrl.Options{
+		StorageClient: tCtx.mockSC,
+		DataProvider:  tCtx.mockSP,
+		GetDeploymentProcessor: func() deployment.DeploymentProcessor {
+			return deployment.NewMockDeploymentProcessor(mctrl)
+		},
 	}
 
-	testMessage, finished, extended := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
-	worker.runOperation(context.Background(), testMessage, testCtrl)
+	testCtrl := &testAsyncController{
+		BaseController: ctrl.NewBaseAsyncController(opts),
+	}
 
-	require.Equal(t, int32(1), finished.Load())
-	require.Equal(t, int32(0), extended.Load())
+	require.Equal(t, 1, tCtx.internalQ.Len())
+
+	msg, err := tCtx.testQueue.Dequeue(tCtx.ctx)
+	require.NoError(t, err)
+	worker.runOperation(context.Background(), msg, testCtrl)
+
+	// Ensure that message is finished.
+	require.Equal(t, 0, tCtx.internalQ.Len(), "message is finished")
 }
 
 func TestRunOperation_ExtendMessageLock(t *testing.T) {
-	tCtx, mctrl := newTestContext(t)
+	tCtx, mctrl := newTestContext(t, defaultTestLockTime)
 	defer mctrl.Finish()
 
 	// set up mocks
@@ -381,32 +432,61 @@ func TestRunOperation_ExtendMessageLock(t *testing.T) {
 	tCtx.mockSC.EXPECT().Save(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	tCtx.mockSM.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
+	testMessage := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
+	err := tCtx.testQueue.Enqueue(tCtx.ctx, testMessage)
+	require.NoError(t, err)
+
 	worker := New(Options{}, tCtx.mockSM, tCtx.testQueue, nil)
 
+	opts := ctrl.Options{
+		StorageClient: tCtx.mockSC,
+		DataProvider:  tCtx.mockSP,
+		GetDeploymentProcessor: func() deployment.DeploymentProcessor {
+			return deployment.NewMockDeploymentProcessor(mctrl)
+		},
+	}
+
 	testCtrl := &testAsyncController{
-		BaseController: ctrl.NewBaseAsyncController(tCtx.mockSC),
+		BaseController: ctrl.NewBaseAsyncController(opts),
 		fn: func(ctx context.Context) (ctrl.Result, error) {
-			time.Sleep(minMessageLockDuration + time.Duration(1)*time.Second)
+			// Sleep for longer than minimum message lock time to call client.ExtendMessage
+			time.Sleep(defaultMinMessageLockDuration * 2)
 			return ctrl.Result{}, nil
 		},
 	}
 
-	testMessage, finished, extended := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
-	testMessage.NextVisibleAt = time.Now().Add(minMessageLockDuration)
+	require.Equal(t, 1, tCtx.internalQ.Len())
 
-	worker.runOperation(context.Background(), testMessage, testCtrl)
+	msg, err := tCtx.testQueue.Dequeue(tCtx.ctx)
+	old := msg.NextVisibleAt
+	require.NoError(t, err)
 
-	require.Equal(t, int32(1), finished.Load())
-	require.Equal(t, int32(1), extended.Load())
+	worker.runOperation(context.Background(), msg, testCtrl)
+
+	require.Equal(t, 0, tCtx.internalQ.Len(), "message is finished")
+	require.Greater(t, msg.NextVisibleAt.UnixNano(), old.UnixNano(), "message lock is extended")
 }
 
 func TestRunOperation_CancelContext(t *testing.T) {
-	tCtx, _ := newTestContext(t)
+	tCtx, _ := newTestContext(t, defaultTestLockTime)
+
+	testMessage := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
+	err := tCtx.testQueue.Enqueue(tCtx.ctx, testMessage)
+	require.NoError(t, err)
+
 	worker := New(Options{}, nil, tCtx.testQueue, nil)
+
+	opts := ctrl.Options{
+		StorageClient: nil,
+		DataProvider:  tCtx.mockSP,
+		GetDeploymentProcessor: func() deployment.DeploymentProcessor {
+			return nil
+		},
+	}
 
 	done := make(chan struct{}, 1)
 	testCtrl := &testAsyncController{
-		BaseController: ctrl.NewBaseAsyncController(nil),
+		BaseController: ctrl.NewBaseAsyncController(opts),
 		fn: func(ctx context.Context) (ctrl.Result, error) {
 			<-ctx.Done()
 			close(done)
@@ -415,18 +495,21 @@ func TestRunOperation_CancelContext(t *testing.T) {
 	}
 
 	ctx, cancel := tCtx.cancellable(10 * time.Millisecond)
-	testMessage, finished, extended := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
-	worker.runOperation(ctx, testMessage, testCtrl)
+	require.Equal(t, 1, tCtx.internalQ.Len())
+
+	msg, err := tCtx.testQueue.Dequeue(tCtx.ctx)
+	require.NoError(t, err)
+
+	worker.runOperation(ctx, msg, testCtrl)
 
 	<-done
 	cancel()
 
-	require.Equal(t, int32(0), finished.Load())
-	require.Equal(t, int32(0), extended.Load())
+	require.Equal(t, 1, tCtx.internalQ.Len(), "ensure that message is not finished")
 }
 
 func TestRunOperation_Timeout(t *testing.T) {
-	tCtx, mctrl := newTestContext(t)
+	tCtx, mctrl := newTestContext(t, defaultTestLockTime)
 	defer mctrl.Finish()
 
 	// set up mocks
@@ -434,11 +517,22 @@ func TestRunOperation_Timeout(t *testing.T) {
 	tCtx.mockSC.EXPECT().Save(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	tCtx.mockSM.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
+	testMessage := genTestMessage(uuid.New(), 10*time.Millisecond)
+	err := tCtx.testQueue.Enqueue(tCtx.ctx, testMessage)
+	require.NoError(t, err)
 	worker := New(Options{}, tCtx.mockSM, tCtx.testQueue, nil)
+
+	opts := ctrl.Options{
+		StorageClient: tCtx.mockSC,
+		DataProvider:  tCtx.mockSP,
+		GetDeploymentProcessor: func() deployment.DeploymentProcessor {
+			return deployment.NewMockDeploymentProcessor(mctrl)
+		},
+	}
 
 	done := make(chan struct{}, 1)
 	testCtrl := &testAsyncController{
-		BaseController: ctrl.NewBaseAsyncController(tCtx.mockSC),
+		BaseController: ctrl.NewBaseAsyncController(opts),
 		fn: func(ctx context.Context) (ctrl.Result, error) {
 			<-ctx.Done()
 			close(done)
@@ -446,30 +540,44 @@ func TestRunOperation_Timeout(t *testing.T) {
 		},
 	}
 
-	testMessage, finished, extended := genTestMessage(uuid.New(), 10*time.Millisecond)
-	worker.runOperation(context.Background(), testMessage, testCtrl)
+	msg, err := tCtx.testQueue.Dequeue(tCtx.ctx)
+	require.NoError(t, err)
+	worker.runOperation(context.Background(), msg, testCtrl)
 	<-done
 
-	require.Equal(t, int32(1), finished.Load())
-	require.Equal(t, int32(0), extended.Load())
+	require.Equal(t, 0, tCtx.internalQ.Len(), "message is finished")
 }
 
 func TestRunOperation_PanicController(t *testing.T) {
-	tCtx, _ := newTestContext(t)
+	tCtx, _ := newTestContext(t, defaultTestLockTime)
+
+	testMessage := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
+	err := tCtx.testQueue.Enqueue(tCtx.ctx, testMessage)
+	require.NoError(t, err)
+
 	worker := New(Options{}, nil, tCtx.testQueue, nil)
 
+	opts := ctrl.Options{
+		StorageClient: tCtx.mockSC,
+		DataProvider:  tCtx.mockSP,
+		GetDeploymentProcessor: func() deployment.DeploymentProcessor {
+			return nil
+		},
+	}
+
 	testCtrl := &testAsyncController{
-		BaseController: ctrl.NewBaseAsyncController(nil),
+		BaseController: ctrl.NewBaseAsyncController(opts),
 		fn: func(ctx context.Context) (ctrl.Result, error) {
 			panic("!!! don't panic !!!")
 		},
 	}
 
-	testMessage, finished, extended := genTestMessage(uuid.New(), ctrl.DefaultAsyncOperationTimeout)
+	msg, err := tCtx.testQueue.Dequeue(tCtx.ctx)
+	require.NoError(t, err)
+
 	require.NotPanics(t, func() {
-		worker.runOperation(tCtx.ctx, testMessage, testCtrl)
+		worker.runOperation(tCtx.ctx, msg, testCtrl)
 	})
 
-	require.Equal(t, int32(0), finished.Load())
-	require.Equal(t, int32(0), extended.Load())
+	require.Equal(t, 1, tCtx.internalQ.Len(), "ensure that message is not finished")
 }

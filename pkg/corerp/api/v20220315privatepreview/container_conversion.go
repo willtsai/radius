@@ -75,13 +75,6 @@ func (src *ContainerResource) ConvertTo() (conv.DataModelInterface, error) {
 		}
 	}
 
-	resourceStatus := v1.ResourceStatus{}
-	if src.Properties.BasicResourceProperties.Status != nil {
-		resourceStatus = v1.ResourceStatus{
-			OutputResources: src.Properties.BasicResourceProperties.Status.OutputResources,
-		}
-	}
-
 	converted := &datamodel.ContainerResource{
 		TrackedResource: v1.TrackedResource{
 			ID:       to.String(src.ID),
@@ -91,9 +84,6 @@ func (src *ContainerResource) ConvertTo() (conv.DataModelInterface, error) {
 			Tags:     to.StringMap(src.Tags),
 		},
 		Properties: datamodel.ContainerProperties{
-			BasicResourceProperties: v1.BasicResourceProperties{
-				Status: resourceStatus,
-			},
 			ProvisioningState: toProvisioningStateDataModel(src.Properties.ProvisioningState),
 			Application:       to.String(src.Properties.Application),
 			Connections:       connections,
@@ -186,7 +176,7 @@ func (dst *ContainerResource) ConvertFrom(src conv.DataModelInterface) error {
 	dst.Properties = &ContainerProperties{
 		BasicResourceProperties: BasicResourceProperties{
 			Status: &ResourceStatus{
-				OutputResources: c.Properties.BasicResourceProperties.Status.OutputResources,
+				OutputResources: v1.BuildExternalOutputResources(c.Properties.Status.OutputResources),
 			},
 		},
 		ProvisioningState: fromProvisioningStateDataModel(c.Properties.ProvisioningState),
@@ -306,6 +296,9 @@ func fromKindDataModel(kind datamodel.IAMKind) *Kind {
 }
 
 func toProtocolDataModel(protocol *Protocol) datamodel.Protocol {
+	if protocol == nil {
+		return datamodel.ProtocolHTTP
+	}
 	switch *protocol {
 	case ProtocolHTTP:
 		return datamodel.ProtocolHTTP
@@ -443,7 +436,7 @@ func toExtensionDataModel(e ExtensionClassification) datamodel.Extension {
 		converted := &datamodel.Extension{
 			Kind: datamodel.ManualScaling,
 			ManualScaling: &datamodel.ManualScalingExtension{
-				Replicas: to.Int32(c.Replicas),
+				Replicas: c.Replicas,
 			},
 		}
 		return *converted
@@ -471,7 +464,7 @@ func fromExtensionClassificationDataModel(e datamodel.Extension) ExtensionClassi
 			Extension: Extension{
 				Kind: to.StringPtr(string(e.Kind)),
 			},
-			Replicas: to.Int32Ptr(e.ManualScaling.Replicas),
+			Replicas: e.ManualScaling.Replicas,
 		}
 		return converted.GetExtension()
 	case datamodel.DaprSidecar:

@@ -10,7 +10,6 @@ import (
 	"net/http"
 
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/connectorrp/datamodel"
@@ -28,8 +27,8 @@ type ListDaprStateStores struct {
 }
 
 // NewListDaprStateStores creates a new instance of ListDaprStateStores.
-func NewListDaprStateStores(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &ListDaprStateStores{ctrl.NewBaseController(ds, sm)}, nil
+func NewListDaprStateStores(opts ctrl.Options) (ctrl.Controller, error) {
+	return &ListDaprStateStores{ctrl.NewBaseController(opts)}, nil
 }
 
 func (daprStateStore *ListDaprStateStores) Run(ctx context.Context, req *http.Request) (rest.Response, error) {
@@ -40,7 +39,7 @@ func (daprStateStore *ListDaprStateStores) Run(ctx context.Context, req *http.Re
 		ResourceType: serviceCtx.ResourceID.Type(),
 	}
 
-	result, err := daprStateStore.DataStore.Query(ctx, query, store.WithPaginationToken(serviceCtx.SkipToken), store.WithMaxQueryItemCount(serviceCtx.Top))
+	result, err := daprStateStore.StorageClient().Query(ctx, query, store.WithPaginationToken(serviceCtx.SkipToken), store.WithMaxQueryItemCount(serviceCtx.Top))
 	if err != nil {
 		return nil, err
 	}

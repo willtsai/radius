@@ -17,12 +17,17 @@ storageProvider:
     database: applicationscore
     # Set primary key to in this configuration or to RADIUS_STORAGEPROVIDER_COSMOSDB_MASTERKEY environment variable
     masterKey: set-me-in-a-different-way
+queueProvider:
+  provider: inmemory
 server:
   host: "0.0.0.0"
   port: 8080
   authType: "ClientCertificate"
   enableArmAuth: true
   armMetadataEndpoint: "https://admin.api-dogfood.resources.windows-int.net/metadata/authentication?api-version=2015-01-01"
+workerServer:
+  maxOperationConcurrency: 3
+  maxOperationRetryCount: 2
 metricsProvider:
   prometheus:
     endpoint: "/metrics"

@@ -1,6 +1,7 @@
 # This is an example of configuration file.
 environment:
   name: self-hosted
+  roleLocation: "global"
 storageProvider:
   # Kubernetes APIServer store. 
   # This supports two modes:
@@ -9,14 +10,21 @@ storageProvider:
   #
   provider: "apiserver"
   apiserver:
-    incluster: true 
+    incluster: true
     context: ''
     namespace: 'radius-system'
 queueProvider:
-  provider: inmemory
+  provider: "apiserver"
+  apiserver:
+    incluster: true
+    context: ''
+    namespace: 'radius-system'
 metricsProvider:
   prometheus:
     endpoint: "/metrics"
 server:
   host: "0.0.0.0"
   port: 5443
+workerServer:
+  maxOperationConcurrency: 3
+  maxOperationRetryCount: 2

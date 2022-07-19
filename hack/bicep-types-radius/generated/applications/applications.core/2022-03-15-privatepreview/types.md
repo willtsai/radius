@@ -63,7 +63,7 @@
 ## ApplicationProperties
 ### Properties
 * **environment**: string (Required): The resource id of the environment linked to application.
-* **provisioningState**: 'Accepted' | 'Canceled' | 'Deleting' | 'Failed' | 'Provisioning' | 'Succeeded' | 'Updating': Provisioning state of the resource at the time the operation was called.
+* **provisioningState**: 'Accepted' | 'Canceled' | 'Deleting' | 'Failed' | 'Provisioning' | 'Succeeded' | 'Updating' (ReadOnly): Provisioning state of the resource at the time the operation was called.
 
 ## SystemData
 ### Properties
@@ -185,19 +185,19 @@
 * **Discriminator**: kind
 
 ### Base Properties
-### ManualScalingExtension
-#### Properties
-* **kind**: 'Applications.Core/ManualScaling@v1alpha1' (Required): Specifies the extensions of a resource.
-* **replicas**: int: Replica count.
-
 ### DaprSidecarExtension
 #### Properties
 * **appId**: string (Required): The Dapr appId. Specifies the identifier used by Dapr for service invocation.
 * **appPort**: int: The Dapr appPort. Specifies the internal listening port for the application to handle requests from the Dapr sidecar.
 * **config**: string: Specifies the Dapr configuration to use for the resource.
-* **kind**: 'dapr.io/Sidecar@v1alpha1' (Required): Specifies the extensions of a resource.
+* **kind**: 'daprSidecar' (Required): Specifies the extensions of a resource.
 * **protocol**: 'TCP' | 'UDP' | 'grpc' | 'http': Protocol in use by the port
 * **provides**: string: Specifies the resource id of a dapr.io.InvokeHttpRoute that can route traffic to this resource.
+
+### ManualScalingExtension
+#### Properties
+* **kind**: 'manualScaling' (Required): Specifies the extensions of a resource.
+* **replicas**: int: Replica count.
 
 
 ## ResourceStatus
@@ -212,12 +212,18 @@
 ## EnvironmentProperties
 ### Properties
 * **compute**: [EnvironmentCompute](#environmentcompute) (Required): Compute resource used by application environment resource.
-* **provisioningState**: 'Accepted' | 'Canceled' | 'Deleting' | 'Failed' | 'Provisioning' | 'Succeeded' | 'Updating': Provisioning state of the resource at the time the operation was called.
+* **provisioningState**: 'Accepted' | 'Canceled' | 'Deleting' | 'Failed' | 'Provisioning' | 'Succeeded' | 'Updating' (ReadOnly): Provisioning state of the resource at the time the operation was called.
 
 ## EnvironmentCompute
-### Properties
-* **kind**: 'kubernetes' (Required): Type of compute resource.
+* **Discriminator**: kind
+
+### Base Properties
 * **resourceId**: string: The resource id of the compute resource for application environment.
+### KubernetesCompute
+#### Properties
+* **kind**: 'kubernetes' (Required): Type of compute resource.
+* **namespace**: string (Required): The namespace to use for the environment.
+
 
 ## TrackedResourceTags
 ### Properties
@@ -229,8 +235,8 @@
 * **application**: string (Required): The resource id of the application linked to Gateway resource.
 * **hostname**: [GatewayPropertiesHostname](#gatewaypropertieshostname): Declare hostname information for the Gateway. Leaving the hostname empty auto-assigns one: mygateway.myapp.PUBLICHOSTNAMEORIP.nip.io.
 * **internal**: bool: Sets Gateway to not be exposed externally (no public IP address associated). Defaults to false (exposed to internet).
-* **provisioningState**: 'Accepted' | 'Canceled' | 'Deleting' | 'Failed' | 'Provisioning' | 'Succeeded' | 'Updating': Provisioning state of the resource at the time the operation was called.
-* **routes**: [GatewayRoute](#gatewayroute)[]: Routes attached to this Gateway
+* **provisioningState**: 'Accepted' | 'Canceled' | 'Deleting' | 'Failed' | 'Provisioning' | 'Succeeded' | 'Updating' (ReadOnly): Provisioning state of the resource at the time the operation was called.
+* **routes**: [GatewayRoute](#gatewayroute)[] (Required): Routes attached to this Gateway
 * **status**: [ResourceStatus](#resourcestatus): Status of a resource.
 
 ## GatewayPropertiesHostname
@@ -254,7 +260,7 @@
 * **application**: string (Required): The resource id of the application linked to HTTP Route resource.
 * **hostname**: string: The internal hostname accepting traffic for the HTTP Route. Readonly.
 * **port**: int: The port number for the HTTP Route. Defaults to 80. Readonly.
-* **provisioningState**: 'Accepted' | 'Canceled' | 'Deleting' | 'Failed' | 'Provisioning' | 'Succeeded' | 'Updating': Provisioning state of the resource at the time the operation was called.
+* **provisioningState**: 'Accepted' | 'Canceled' | 'Deleting' | 'Failed' | 'Provisioning' | 'Succeeded' | 'Updating' (ReadOnly): Provisioning state of the resource at the time the operation was called.
 * **scheme**: string: The scheme used for traffic. Readonly.
 * **status**: [ResourceStatus](#resourcestatus): Status of a resource.
 * **url**: string: A stable URL that that can be used to route traffic to a resource. Readonly.

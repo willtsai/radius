@@ -7,7 +7,7 @@ package cmd
 
 import (
 	"github.com/project-radius/radius/pkg/cli"
-	"github.com/project-radius/radius/pkg/cli/environments"
+	"github.com/project-radius/radius/pkg/cli/connections"
 	"github.com/project-radius/radius/pkg/cli/objectformats"
 	"github.com/project-radius/radius/pkg/cli/output"
 	"github.com/spf13/cobra"
@@ -27,54 +27,17 @@ func init() {
 
 func listResources(cmd *cobra.Command, args []string) error {
 	config := ConfigFromContext(cmd.Context())
-	env, err := cli.RequireEnvironment(cmd, config)
-	if err != nil {
-		return err
-	}
-	isUCPEnabled := false
-	if env.GetKind() == environments.KindKubernetes {
-		isUCPEnabled = env.(*environments.KubernetesEnvironment).GetEnableUCP()
-	}
-	if isUCPEnabled {
-		err := listResourcesUCP(cmd, args, env)
-		if err != nil {
-			return err
-		}
-	} else {
-		err := listResourcesLegacy(cmd, args, env)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func listResourcesLegacy(cmd *cobra.Command, args []string, env environments.Environment) error {
-	applicationName, err := cli.RequireApplicationArgs(cmd, args, env)
+	workspace, err := cli.RequireWorkspace(cmd, config)
 	if err != nil {
 		return err
 	}
 
-	client, err := environments.CreateLegacyManagementClient(cmd.Context(), env)
+	applicationName, err := cli.RequireApplicationArgs(cmd, args, *workspace)
 	if err != nil {
 		return err
 	}
 
-	resourceList, err := client.ListAllResourcesByApplication(cmd.Context(), applicationName)
-	if err != nil {
-		return err
-	}
-
-	return printOutput(cmd, resourceList.Value, true)
-}
-
-func listResourcesUCP(cmd *cobra.Command, args []string, env environments.Environment) error {
-	applicationName, err := cli.RequireApplicationArgs(cmd, args, env)
-	if err != nil {
-		return err
-	}
-
-	client, err := environments.CreateApplicationsManagementClient(cmd.Context(), env)
+	client, err := connections.DefaultFactory.CreateApplicationsManagementClient(cmd.Context(), *workspace)
 	if err != nil {
 		return err
 	}
@@ -91,13 +54,8 @@ func printOutput(cmd *cobra.Command, obj interface{}, isLegacy bool) error {
 	if err != nil {
 		return err
 	}
-	var formatterOptions output.FormatterOptions
-	if !isLegacy {
-		formatterOptions = objectformats.GetResourceTableFormat()
-	} else {
-		formatterOptions = objectformats.GetResourceTableFormatOld()
-	}
-	err = output.Write(format, obj, cmd.OutOrStdout(), formatterOptions)
+
+	err = output.Write(format, obj, cmd.OutOrStdout(), objectformats.GetResourceTableFormat())
 	if err != nil {
 		return err
 	}

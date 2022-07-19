@@ -10,14 +10,27 @@ import (
 	"fmt"
 
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
+	ctrl "github.com/project-radius/radius/pkg/armrpc/asyncoperation/controller"
 	"github.com/project-radius/radius/pkg/armrpc/asyncoperation/worker"
 	"github.com/project-radius/radius/pkg/armrpc/hostoptions"
 
-	containers_ctrl "github.com/project-radius/radius/pkg/corerp/backend/controller/containers"
+	backend_ctrl "github.com/project-radius/radius/pkg/corerp/backend/controller"
+	"github.com/project-radius/radius/pkg/corerp/backend/deployment"
+	"github.com/project-radius/radius/pkg/corerp/model"
 )
 
 const (
 	providerName = "Applications.Core"
+)
+
+var (
+	// ResourceTypeNames is the array that holds resource types that needs async processing.
+	// We use this array to generate generic backend controller for each resource.
+	ResourceTypeNames = []string{
+		"Applications.Core/containers",
+		"Applications.Core/gateways",
+		"Applications.Core/httpRoutes",
+	}
 )
 
 // Service is a service to run AsyncReqeustProcessWorker.
@@ -46,15 +59,45 @@ func (w *Service) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Register controllers
-	err := w.Controllers.Register(
-		ctx,
-		containers_ctrl.ResourceTypeName,
-		v1.OperationPut,
-		containers_ctrl.NewUpdateContainer)
+	coreAppModel, err := model.NewApplicationModel(w.Options.Arm, w.KubeClient, w.KubeClientSet)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to initialize application model: %w", err)
 	}
 
-	return w.Start(ctx, worker.Options{})
+	opts := ctrl.Options{
+		DataProvider: w.StorageProvider,
+		SecretClient: w.SecretClient,
+		KubeClient:   w.KubeClient,
+		GetDeploymentProcessor: func() deployment.DeploymentProcessor {
+			return deployment.NewDeploymentProcessor(coreAppModel, w.StorageProvider, w.SecretClient, w.KubeClient, w.KubeClientSet)
+		},
+	}
+
+	for _, rt := range ResourceTypeNames {
+		// Register controllers
+		err = w.Controllers.Register(ctx, rt, v1.OperationPut, backend_ctrl.NewCreateOrUpdateResource, opts)
+		if err != nil {
+			panic(err)
+		}
+		err = w.Controllers.Register(ctx, rt, v1.OperationPatch, backend_ctrl.NewCreateOrUpdateResource, opts)
+		if err != nil {
+			panic(err)
+		}
+		err = w.Controllers.Register(ctx, rt, v1.OperationDelete, backend_ctrl.NewDeleteResource, opts)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	workerOpts := worker.Options{}
+	if w.Options.Config.WorkerServer != nil {
+		if w.Options.Config.WorkerServer.MaxOperationConcurrency != nil {
+			workerOpts.MaxOperationConcurrency = *w.Options.Config.WorkerServer.MaxOperationConcurrency
+		}
+		if w.Options.Config.WorkerServer.MaxOperationRetryCount != nil {
+			workerOpts.MaxOperationRetryCount = *w.Options.Config.WorkerServer.MaxOperationRetryCount
+		}
+	}
+
+	return w.Start(ctx, workerOpts)
 }

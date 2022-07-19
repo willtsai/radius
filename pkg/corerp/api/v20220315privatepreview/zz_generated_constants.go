@@ -38,25 +38,6 @@ func (c CreatedByType) ToPtr() *CreatedByType {
 	return &c
 }
 
-// EnvironmentComputeKind - Type of compute resource.
-type EnvironmentComputeKind string
-
-const (
-	EnvironmentComputeKindKubernetes EnvironmentComputeKind = "kubernetes"
-)
-
-// PossibleEnvironmentComputeKindValues returns the possible values for the EnvironmentComputeKind const type.
-func PossibleEnvironmentComputeKindValues() []EnvironmentComputeKind {
-	return []EnvironmentComputeKind{	
-		EnvironmentComputeKindKubernetes,
-	}
-}
-
-// ToPtr returns a *EnvironmentComputeKind pointing to the current value.
-func (c EnvironmentComputeKind) ToPtr() *EnvironmentComputeKind {
-	return &c
-}
-
 // Kind - The kind of IAM provider to configure
 type Kind string
 
@@ -122,7 +103,7 @@ func (c Protocol) ToPtr() *Protocol {
 	return &c
 }
 
-// ProvisioningState - Gets the status of the container at the time the operation was called.
+// ProvisioningState - Provisioning state of the resource at the time the operation was called.
 type ProvisioningState string
 
 const (

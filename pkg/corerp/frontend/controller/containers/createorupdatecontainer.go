@@ -12,7 +12,6 @@ import (
 	"time"
 
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/corerp/datamodel"
@@ -35,8 +34,8 @@ type CreateOrUpdateContainer struct {
 }
 
 // NewCreateOrUpdateContainer creates a new CreateOrUpdateContainer.
-func NewCreateOrUpdateContainer(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &CreateOrUpdateContainer{ctrl.NewBaseController(ds, sm)}, nil
+func NewCreateOrUpdateContainer(opts ctrl.Options) (ctrl.Controller, error) {
+	return &CreateOrUpdateContainer{ctrl.NewBaseController(opts)}, nil
 }
 
 // Run executes CreateOrUpdateContainer operation.
@@ -79,7 +78,7 @@ func (e *CreateOrUpdateContainer) Run(ctx context.Context, req *http.Request) (r
 		return nil, err
 	}
 
-	err = e.AsyncOperation.QueueAsyncOperation(ctx, serviceCtx, AsyncPutContainerOperationTimeout)
+	err = e.StatusManager().QueueAsyncOperation(ctx, serviceCtx, AsyncPutContainerOperationTimeout)
 	if err != nil {
 		newResource.Properties.ProvisioningState = v1.ProvisioningStateFailed
 		_, rbErr := e.SaveResource(ctx, serviceCtx.ResourceID.String(), newResource, obj.ETag)
@@ -94,7 +93,8 @@ func (e *CreateOrUpdateContainer) Run(ctx context.Context, req *http.Request) (r
 		respCode = http.StatusAccepted
 	}
 
-	return rest.NewAsyncOperationResponse(newResource, newResource.TrackedResource.Location, respCode, serviceCtx.ResourceID, serviceCtx.OperationID), nil
+	return rest.NewAsyncOperationResponse(newResource, newResource.TrackedResource.Location, respCode,
+		serviceCtx.ResourceID, serviceCtx.OperationID, serviceCtx.APIVersion), nil
 }
 
 // Validate extracts versioned resource from request and validate the properties.

@@ -14,11 +14,12 @@
     "properties": {
       "status": {
         "outputResources": [{
-          "LocalID": "Deployment",
-          "ResourceType": {
-            "Type": "azure.redis",
-            "Provider": "azure"
-          }
+            "LocalID": "AzureRedis",
+            "Dependencies": null,
+            "ResourceType": {
+              "type": "azure.redis",
+              "provider": "azure"
+            }
         }]
       },
       "provisioningState": "Succeeded",

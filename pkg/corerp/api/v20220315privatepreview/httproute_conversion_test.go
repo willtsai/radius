@@ -11,12 +11,14 @@ import (
 
 	"github.com/project-radius/radius/pkg/armrpc/api/conv"
 	"github.com/project-radius/radius/pkg/corerp/datamodel"
+	radiustesting "github.com/project-radius/radius/pkg/corerp/testing"
+	"github.com/project-radius/radius/pkg/radrp/outputresource"
 	"github.com/stretchr/testify/require"
 )
 
 func TestHTTPRouteConvertVersionedToDataModel(t *testing.T) {
 	// arrange
-	rawPayload := loadTestData("httprouteresource.json")
+	rawPayload := radiustesting.ReadFixture("httprouteresource.json")
 	r := &HTTPRouteResource{}
 	err := json.Unmarshal(rawPayload, r)
 	require.NoError(t, err)
@@ -24,7 +26,6 @@ func TestHTTPRouteConvertVersionedToDataModel(t *testing.T) {
 	// act
 	dm, err := r.ConvertTo()
 
-	resourceType := map[string]interface{}{"Provider": "kubernetes", "Type": "HttpRoute"}
 	// assert
 	require.NoError(t, err)
 	ct := dm.(*datamodel.HTTPRoute)
@@ -36,14 +37,13 @@ func TestHTTPRouteConvertVersionedToDataModel(t *testing.T) {
 	require.Equal(t, int32(8080), ct.Properties.Port)
 	require.Equal(t, "http", ct.Properties.Scheme)
 	require.Equal(t, "http://testapplications.com/httproute/", ct.Properties.URL)
-	require.Equal(t, "Deployment", ct.Properties.Status.OutputResources[0]["LocalID"])
-	require.Equal(t, resourceType, ct.Properties.Status.OutputResources[0]["ResourceType"])
+	require.Equal(t, []outputresource.OutputResource(nil), ct.Properties.Status.OutputResources)
 	require.Equal(t, "2022-03-15-privatepreview", ct.InternalMetadata.UpdatedAPIVersion)
 }
 
 func TestHTTPRouteConvertDataModelToVersioned(t *testing.T) {
 	// arrange
-	rawPayload := loadTestData("httprouteresourcedatamodel.json")
+	rawPayload := radiustesting.ReadFixture("httprouteresourcedatamodel.json")
 	r := &datamodel.HTTPRoute{}
 	err := json.Unmarshal(rawPayload, r)
 	require.NoError(t, err)
@@ -52,7 +52,6 @@ func TestHTTPRouteConvertDataModelToVersioned(t *testing.T) {
 	versioned := &HTTPRouteResource{}
 	err = versioned.ConvertFrom(r)
 
-	resourceType := map[string]interface{}{"Provider": "kubernetes", "Type": "HttpRoute"}
 	// assert
 	require.NoError(t, err)
 	require.Equal(t, "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/radius-test-rg/providers/Applications.Core/httpRoutes/route0", r.ID)
@@ -63,8 +62,8 @@ func TestHTTPRouteConvertDataModelToVersioned(t *testing.T) {
 	require.Equal(t, int32(8080), r.Properties.Port)
 	require.Equal(t, "http", r.Properties.Scheme)
 	require.Equal(t, "http://testapplications.com/httproute/", r.Properties.URL)
-	require.Equal(t, "Deployment", r.Properties.Status.OutputResources[0]["LocalID"])
-	require.Equal(t, resourceType, r.Properties.Status.OutputResources[0]["ResourceType"])
+	require.Equal(t, "Deployment", versioned.Properties.Status.OutputResources[0]["LocalID"])
+	require.Equal(t, "kubernetes", versioned.Properties.Status.OutputResources[0]["Provider"])
 }
 
 func TestHTTPRouteConvertFromValidation(t *testing.T) {

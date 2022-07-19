@@ -13,15 +13,9 @@ import (
 
 func init() {
 	envInitCmd.AddCommand(envInitLocalCmd)
-
-	// TODO: right now we only handle Azure as a special case. This needs to be generalized
-	// to handle other providers.
-	registerAzureProviderFlags(envInitLocalCmd)
-	envInitLocalCmd.Flags().String("ucp-image", "", "Specify the UCP image to use")
-	envInitLocalCmd.Flags().String("ucp-tag", "", "Specify the UCP tag to use")
 }
 
-type DevEnvironmentParams struct {
+type EnvironmentParams struct {
 	Name      string
 	Providers *environments.Providers
 }
@@ -34,4 +28,5 @@ var envInitLocalCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return initSelfHosted(cmd, args, Dev)
 	},
+	Hidden: true,
 }

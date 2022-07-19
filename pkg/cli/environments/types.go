@@ -26,6 +26,7 @@ type Environment interface {
 	GetKind() string
 	GetDefaultApplication() string
 	GetKubeContext() string
+	GetId() string
 
 	// GetStatusLink provides an optional URL for display of the environment.
 	GetStatusLink() string
@@ -33,6 +34,8 @@ type Environment interface {
 	// GetContainerRegistry provides an optional container registry override. The registry is used
 	// by the 'rad app ...' family of commands for development purposes.
 	GetContainerRegistry() *Registry
+
+	GetProviders() *Providers
 }
 
 // Registry represent the configuration for a container registry.
@@ -78,16 +81,6 @@ func CreateDiagnosticsClient(ctx context.Context, env Environment) (clients.Diag
 }
 
 type LegacyManagementEnvironment interface {
-	CreateLegacyManagementClient(ctx context.Context) (clients.LegacyManagementClient, error)
-}
-
-func CreateLegacyManagementClient(ctx context.Context, env Environment) (clients.LegacyManagementClient, error) {
-	me, ok := env.(LegacyManagementEnvironment)
-	if !ok {
-		return nil, fmt.Errorf("an environment of kind '%s' does not support management operations", env.GetKind())
-	}
-
-	return me.CreateLegacyManagementClient(ctx)
 }
 
 type ApplicationsManagementEnvironment interface {

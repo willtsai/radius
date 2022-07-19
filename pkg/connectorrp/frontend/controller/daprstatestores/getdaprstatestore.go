@@ -10,7 +10,6 @@ import (
 	"errors"
 	"net/http"
 
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/connectorrp/datamodel"
@@ -27,8 +26,8 @@ type GetDaprStateStore struct {
 }
 
 // NewGetDaprStateStore creates a new instance of GetDaprStateStore.
-func NewGetDaprStateStore(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &GetDaprStateStore{ctrl.NewBaseController(ds, sm)}, nil
+func NewGetDaprStateStore(opts ctrl.Options) (ctrl.Controller, error) {
+	return &GetDaprStateStore{ctrl.NewBaseController(opts)}, nil
 }
 
 func (daprStateStore *GetDaprStateStore) Run(ctx context.Context, req *http.Request) (rest.Response, error) {

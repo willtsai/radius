@@ -28,6 +28,14 @@ func (src *GatewayResource) ConvertTo() (conv.DataModelInterface, error) {
 		}
 	}
 
+	var hostname *datamodel.GatewayPropertiesHostname
+	if src.Properties.Hostname != nil {
+		hostname = &datamodel.GatewayPropertiesHostname{
+			FullyQualifiedHostname: to.String(src.Properties.Hostname.FullyQualifiedHostname),
+			Prefix:                 to.String(src.Properties.Hostname.Prefix),
+		}
+	}
+
 	converted := &datamodel.Gateway{
 		TrackedResource: v1.TrackedResource{
 			ID:       to.String(src.ID),
@@ -37,18 +45,10 @@ func (src *GatewayResource) ConvertTo() (conv.DataModelInterface, error) {
 			Tags:     to.StringMap(src.Tags),
 		},
 		Properties: datamodel.GatewayProperties{
-			BasicResourceProperties: v1.BasicResourceProperties{
-				Status: v1.ResourceStatus{
-					OutputResources: src.Properties.BasicResourceProperties.Status.OutputResources,
-				},
-			},
 			ProvisioningState: toProvisioningStateDataModel(src.Properties.ProvisioningState),
 			Application:       to.String(src.Properties.Application),
-			Hostname: &datamodel.GatewayPropertiesHostname{
-				FullyQualifiedHostname: to.String(src.Properties.Hostname.FullyQualifiedHostname),
-				Prefix:                 to.String(src.Properties.Hostname.Prefix),
-			},
-			Routes: routes,
+			Hostname:          hostname,
+			Routes:            routes,
 		},
 		InternalMetadata: v1.InternalMetadata{
 			UpdatedAPIVersion: Version,
@@ -77,6 +77,14 @@ func (dst *GatewayResource) ConvertFrom(src conv.DataModelInterface) error {
 		}
 	}
 
+	var hostname *GatewayPropertiesHostname
+	if g.Properties.Hostname != nil {
+		hostname = &GatewayPropertiesHostname{
+			FullyQualifiedHostname: to.StringPtr(g.Properties.Hostname.FullyQualifiedHostname),
+			Prefix:                 to.StringPtr(g.Properties.Hostname.Prefix),
+		}
+	}
+
 	dst.ID = to.StringPtr(g.ID)
 	dst.Name = to.StringPtr(g.Name)
 	dst.Type = to.StringPtr(g.Type)
@@ -86,16 +94,13 @@ func (dst *GatewayResource) ConvertFrom(src conv.DataModelInterface) error {
 	dst.Properties = &GatewayProperties{
 		BasicResourceProperties: BasicResourceProperties{
 			Status: &ResourceStatus{
-				OutputResources: g.Properties.BasicResourceProperties.Status.OutputResources,
+				OutputResources: v1.BuildExternalOutputResources(g.Properties.Status.OutputResources),
 			},
 		},
 		ProvisioningState: fromProvisioningStateDataModel(g.Properties.ProvisioningState),
 		Application:       to.StringPtr(g.Properties.Application),
-		Hostname: &GatewayPropertiesHostname{
-			FullyQualifiedHostname: to.StringPtr(g.Properties.Hostname.FullyQualifiedHostname),
-			Prefix:                 to.StringPtr(g.Properties.Hostname.Prefix),
-		},
-		Routes: routes,
+		Hostname:          hostname,
+		Routes:            routes,
 	}
 
 	return nil

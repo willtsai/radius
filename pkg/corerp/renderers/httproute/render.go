@@ -8,6 +8,7 @@ package httproute
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,6 +20,7 @@ import (
 	"github.com/project-radius/radius/pkg/kubernetes"
 	"github.com/project-radius/radius/pkg/radrp/outputresource"
 	"github.com/project-radius/radius/pkg/resourcekinds"
+	"github.com/project-radius/radius/pkg/rp"
 	"github.com/project-radius/radius/pkg/ucp/resources"
 )
 
@@ -31,7 +33,7 @@ func (r Renderer) GetDependencyIDs(ctx context.Context, resource conv.DataModelI
 
 func (r Renderer) Render(ctx context.Context, dm conv.DataModelInterface, options renderers.RenderOptions) (renderers.RendererOutput, error) {
 
-	route, ok := dm.(datamodel.HTTPRoute)
+	route, ok := dm.(*datamodel.HTTPRoute)
 	if !ok {
 		return renderers.RendererOutput{}, conv.ErrInvalidModelConversion
 	}
@@ -42,15 +44,13 @@ func (r Renderer) Render(ctx context.Context, dm conv.DataModelInterface, option
 	}
 	applicationName := appId.Name()
 
-	if route.Properties == nil || route.Properties.Port == 0 {
+	if route.Properties.Port == 0 {
 		defaultPort := kubernetes.GetDefaultPort()
-		route.Properties = &datamodel.HTTPRouteProperties{
-			Port: defaultPort,
-		}
+		route.Properties.Port = defaultPort
 	}
 
-	computedValues := map[string]renderers.ComputedValueReference{
-		"host": {
+	computedValues := map[string]rp.ComputedValueReference{
+		"hostname": {
 			Value: kubernetes.MakeResourceName(applicationName, route.Name),
 		},
 		"port": {
@@ -64,7 +64,7 @@ func (r Renderer) Render(ctx context.Context, dm conv.DataModelInterface, option
 		},
 	}
 
-	service, err := r.makeService(&route, options)
+	service, err := r.makeService(route, options)
 	if err != nil {
 		return renderers.RendererOutput{}, err
 	}
@@ -77,12 +77,15 @@ func (r Renderer) Render(ctx context.Context, dm conv.DataModelInterface, option
 }
 
 func (r *Renderer) makeService(route *datamodel.HTTPRoute, options renderers.RenderOptions) (outputresource.OutputResource, error) {
-
 	appId, err := resources.Parse(route.Properties.Application)
+
 	if err != nil {
 		return outputresource.OutputResource{}, fmt.Errorf("invalid application id: %w. id: %s", err, route.Properties.Application)
 	}
 	applicationName := appId.Name()
+
+	typeParts := strings.Split(ResourceType, "/")
+	resourceTypeSuffix := typeParts[len(typeParts)-1]
 
 	service := &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
@@ -95,13 +98,13 @@ func (r *Renderer) makeService(route *datamodel.HTTPRoute, options renderers.Ren
 			Labels:    kubernetes.MakeDescriptiveLabels(applicationName, route.Name),
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: kubernetes.MakeRouteSelectorLabels(applicationName, ResourceTypeName, route.Name),
+			Selector: kubernetes.MakeRouteSelectorLabels(applicationName, resourceTypeSuffix, route.Name),
 			Type:     corev1.ServiceTypeClusterIP,
 			Ports: []corev1.ServicePort{
 				{
 					Name:       route.Name,
 					Port:       route.Properties.Port,
-					TargetPort: intstr.FromString(kubernetes.GetShortenedTargetPortName(applicationName + ResourceTypeName + route.Name)),
+					TargetPort: intstr.FromString(kubernetes.GetShortenedTargetPortName(applicationName + resourceTypeSuffix + route.Name)),
 					Protocol:   corev1.ProtocolTCP,
 				},
 			},

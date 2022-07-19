@@ -13,21 +13,23 @@
     },
     "properties": {
         "status": {
-          "outputResources": [{
-            "LocalID": "Deployment",
-            "ResourceType": {
-              "Type": "DaprPubSubProvider",
-              "Provider": "kubernetes"
-            }
-          }]
-        },
+            "outputResources": [{
+                "LocalID": "AzureServiceBusTopic",
+                "Dependencies": null,
+                "ResourceType": {
+                  "type": "pubsub.azure.servicebus",
+                  "provider": "azure"
+                }
+            }]
+          },
         "provisioningState": "Succeeded",
         "application": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/radius-test-rg/providers/Applications.Core/applications/testApplication",
         "environment": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/radius-test-rg/providers/Applications.Core/environments/env0",
         "kind": "pubsub.azure.servicebus",
         "daprPubSubAzureServiceBus": {
-          "resource": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testGroup/providers/Microsoft.ServiceBus/namespaces/testQueue"
-        }
+          "resource": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testGroup/providers/Microsoft.ServiceBus/namespaces/radius-eastus-async/topics/test-topic"
+        },
+        "topic": "test-topic"
     },
     "tenantId": "00000000-0000-0000-0000-000000000000",
     "subscriptionId": "00000000-0000-0000-0000-000000000000",

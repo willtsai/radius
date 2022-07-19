@@ -6,10 +6,8 @@
 package cmd
 
 import (
-	"errors"
-
 	"github.com/project-radius/radius/pkg/cli"
-	"github.com/project-radius/radius/pkg/cli/environments"
+	"github.com/project-radius/radius/pkg/cli/connections"
 	"github.com/spf13/cobra"
 )
 
@@ -27,21 +25,12 @@ func init() {
 
 func deleteResource(cmd *cobra.Command, args []string) error {
 	config := ConfigFromContext(cmd.Context())
-	env, err := cli.RequireEnvironment(cmd, config)
+	workspace, err := cli.RequireWorkspace(cmd, config)
 	if err != nil {
 		return err
 	}
 
-	isUCPEnabled := false
-	if env.GetKind() == environments.KindKubernetes {
-		isUCPEnabled = env.(*environments.KubernetesEnvironment).GetEnableUCP()
-	}
-
-	if !isUCPEnabled {
-		return errors.New("Delete is not enabled")
-	}
-
-	client, err := environments.CreateApplicationsManagementClient(cmd.Context(), env)
+	client, err := connections.DefaultFactory.CreateApplicationsManagementClient(cmd.Context(), *workspace)
 	if err != nil {
 		return err
 	}
@@ -51,10 +40,10 @@ func deleteResource(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	deleteResponse, err := client.DeleteResource(cmd.Context(), resourceType, resourceName)
+	_, err = client.DeleteResource(cmd.Context(), resourceType, resourceName)
 	if err != nil {
 		return err
 	}
 
-	return printOutput(cmd, deleteResponse, false)
+	return nil
 }

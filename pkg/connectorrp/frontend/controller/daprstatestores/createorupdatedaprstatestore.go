@@ -11,7 +11,6 @@ import (
 	"net/http"
 
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/connectorrp/datamodel"
@@ -28,8 +27,8 @@ type CreateOrUpdateDaprStateStore struct {
 }
 
 // NewCreateOrUpdateDaprStateStore creates a new instance of CreateOrUpdateDaprStateStore.
-func NewCreateOrUpdateDaprStateStore(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &CreateOrUpdateDaprStateStore{ctrl.NewBaseController(ds, sm)}, nil
+func NewCreateOrUpdateDaprStateStore(opts ctrl.Options) (ctrl.Controller, error) {
+	return &CreateOrUpdateDaprStateStore{ctrl.NewBaseController(opts)}, nil
 }
 
 // Run executes CreateOrUpdateDaprStateStore operation.
@@ -40,8 +39,18 @@ func (daprStateStore *CreateOrUpdateDaprStateStore) Run(ctx context.Context, req
 		return nil, err
 	}
 
-	// TODO Integrate with renderer/deployment processor to validate associated resource existence (if fromResource is defined)
-	// and store resource properties and secrets reference
+	rendererOutput, err := daprStateStore.DeploymentProcessor().Render(ctx, serviceCtx.ResourceID, newResource)
+	if err != nil {
+		return nil, err
+	}
+	deploymentOutput, err := daprStateStore.DeploymentProcessor().Deploy(ctx, serviceCtx.ResourceID, rendererOutput)
+	if err != nil {
+		return nil, err
+	}
+
+	newResource.Properties.BasicResourceProperties.Status.OutputResources = deploymentOutput.Resources
+	newResource.InternalMetadata.ComputedValues = deploymentOutput.ComputedValues
+	newResource.InternalMetadata.SecretValues = deploymentOutput.SecretValues
 
 	// Read existing resource info from the data store
 	existingResource := &datamodel.DaprStateStore{}

@@ -20,6 +20,7 @@ import (
 	"github.com/project-radius/radius/pkg/kubernetes"
 	"github.com/project-radius/radius/pkg/radrp/outputresource"
 	"github.com/project-radius/radius/pkg/resourcekinds"
+	"github.com/project-radius/radius/pkg/rp"
 	"github.com/project-radius/radius/pkg/ucp/resources"
 	contourv1 "github.com/projectcontour/contour/apis/projectcontour/v1"
 )
@@ -30,7 +31,7 @@ type Renderer struct {
 // GetDependencyIDs fetches all the httproutes used by the gateway
 func (r Renderer) GetDependencyIDs(ctx context.Context, dm conv.DataModelInterface) (radiusResourceIDs []resources.ID, azureResourceIDs []resources.ID, err error) {
 	// Need all httproutes that are used by this gateway
-	gateway, ok := dm.(datamodel.Gateway)
+	gateway, ok := dm.(*datamodel.Gateway)
 	if !ok {
 		return nil, nil, conv.ErrInvalidModelConversion
 	}
@@ -51,7 +52,7 @@ func (r Renderer) GetDependencyIDs(ctx context.Context, dm conv.DataModelInterfa
 // Render creates the kubernetes output resource for the gateway and its dependency - httproute
 func (r Renderer) Render(ctx context.Context, dm conv.DataModelInterface, options renderers.RenderOptions) (renderers.RendererOutput, error) {
 	outputResources := []outputresource.OutputResource{}
-	gateway, ok := dm.(datamodel.Gateway)
+	gateway, ok := dm.(*datamodel.Gateway)
 	if !ok {
 		return renderers.RendererOutput{}, conv.ErrInvalidModelConversion
 	}
@@ -61,11 +62,11 @@ func (r Renderer) Render(ctx context.Context, dm conv.DataModelInterface, option
 	}
 	applicationName := appId.Name()
 	gatewayName := kubernetes.MakeResourceName(applicationName, gateway.Name)
-	hostname, err := getHostname(gateway, &gateway.Properties, applicationName, options)
+	hostname, err := getHostname(*gateway, &gateway.Properties, applicationName, options)
 	if err != nil {
 		return renderers.RendererOutput{}, fmt.Errorf("getting hostname failed with error: %s", err)
 	}
-	gatewayObject, err := MakeGateway(options, &gateway, gateway.Name, applicationName, hostname)
+	gatewayObject, err := MakeGateway(options, gateway, gateway.Name, applicationName, hostname)
 	if err != nil {
 		return renderers.RendererOutput{}, err
 	}
@@ -81,13 +82,13 @@ func (r Renderer) Render(ctx context.Context, dm conv.DataModelInterface, option
 		computedHostname = "http://" + hostname
 	}
 
-	computedValues := map[string]renderers.ComputedValueReference{
+	computedValues := map[string]rp.ComputedValueReference{
 		"url": {
 			Value: computedHostname,
 		},
 	}
 
-	httpRouteObjects, err := MakeHttpRoutes(options, gateway, &gateway.Properties, gatewayName, applicationName)
+	httpRouteObjects, err := MakeHttpRoutes(options, *gateway, &gateway.Properties, gatewayName, applicationName)
 	if err != nil {
 		return renderers.RendererOutput{}, err
 	}
@@ -164,9 +165,11 @@ func MakeHttpRoutes(options renderers.RenderOptions, resource datamodel.Gateway,
 	for _, route := range gateway.Routes {
 		routeProperties := dependencies[route.Destination]
 		port := kubernetes.GetDefaultPort()
-		routePort, ok := routeProperties.ComputedValues["port"].(int32)
+
+		// HACK, IDK why this returns a float64 instead of int32 when coming from the corerp
+		routePort, ok := routeProperties.ComputedValues["port"].(float64)
 		if ok {
-			port = routePort
+			port = int32(routePort)
 		}
 
 		routeName, err := getRouteName(&route)

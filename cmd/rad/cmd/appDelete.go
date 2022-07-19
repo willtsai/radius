@@ -10,12 +10,10 @@ import (
 	"fmt"
 
 	"github.com/project-radius/radius/pkg/cli"
-	"github.com/project-radius/radius/pkg/cli/clients"
-	"github.com/project-radius/radius/pkg/cli/environments"
+	"github.com/project-radius/radius/pkg/cli/connections"
 	"github.com/project-radius/radius/pkg/cli/prompt"
+	"github.com/project-radius/radius/pkg/cli/workspaces"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"golang.org/x/text/cases"
 )
 
 // appDeleteCmd command to delete an application
@@ -39,19 +37,19 @@ func deleteApplication(cmd *cobra.Command, args []string) error {
 	}
 
 	config := ConfigFromContext(cmd.Context())
-	env, err := cli.RequireEnvironment(cmd, config)
+	workspace, err := cli.RequireWorkspace(cmd, config)
 	if err != nil {
 		return err
 	}
 
-	applicationName, err := cli.RequireApplicationArgs(cmd, args, env)
+	applicationName, err := cli.RequireApplicationArgs(cmd, args, *workspace)
 	if err != nil {
 		return err
 	}
 
 	// Prompt user to confirm deletion
 	if !yes {
-		confirmed, err := prompt.ConfirmWithDefault(fmt.Sprintf("Are you sure you want to delete '%v' from '%v' [y/N]?", applicationName, env.GetName()), prompt.No)
+		confirmed, err := prompt.ConfirmWithDefault(fmt.Sprintf("Are you sure you want to delete '%v' from '%v' [y/N]?", applicationName, workspace.Name), prompt.No)
 		if err != nil {
 			return err
 		}
@@ -60,84 +58,23 @@ func deleteApplication(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	isUCPEnabled := false
-	if env.GetKind() == environments.KindKubernetes {
-		isUCPEnabled = env.(*environments.KubernetesEnvironment).GetEnableUCP()
+	err = DeleteApplication(cmd.Context(), *workspace, applicationName)
+	if err != nil {
+		return err
 	}
-	if isUCPEnabled {
-		err := DeleteApplicationUCP(cmd, args, env, applicationName, config)
-		if err != nil {
-			return err
-		}
-	} else {
-		err := DeleteApplicationLegacy(cmd, args, env, applicationName, config)
-		if err != nil {
-			return err
-		}
-	}
+
 	return nil
 }
 
-func DeleteApplicationUCP(cmd *cobra.Command, args []string, env environments.Environment, applicationName string, config *viper.Viper) error {
-	client, err := environments.CreateApplicationsManagementClient(cmd.Context(), env)
+func DeleteApplication(ctx context.Context, workspace workspaces.Workspace, applicationName string) error {
+	client, err := connections.DefaultFactory.CreateApplicationsManagementClient(ctx, workspace)
 	if err != nil {
 		return err
 	}
 
-	deleteResponse, err := client.DeleteApplication(cmd.Context(), applicationName)
+	_, err = client.DeleteApplication(ctx, applicationName)
 	if err != nil {
 		return err
-	}
-
-	return printOutput(cmd, deleteResponse, false)
-}
-
-func DeleteApplicationLegacy(cmd *cobra.Command, args []string, env environments.Environment, applicationName string, config *viper.Viper) error {
-	client, err := environments.CreateLegacyManagementClient(cmd.Context(), env)
-	if err != nil {
-		return err
-	}
-
-	err = appDeleteInner(cmd.Context(), client, applicationName, env)
-	if err != nil {
-		return err
-	}
-
-	err = updateApplicationConfig(cmd.Context(), config, env, applicationName)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-// appDeleteInner deletes an application without argument/flag validation.
-func appDeleteInner(ctx context.Context, client clients.LegacyManagementClient, applicationName string, env environments.Environment) error {
-	err := client.DeleteApplication(ctx, applicationName)
-	if err != nil {
-		return fmt.Errorf("delete application error: %w", err)
-	}
-
-	fmt.Printf("Application '%s' has been deleted.\n", applicationName)
-	return nil
-}
-
-func updateApplicationConfig(ctx context.Context, config *viper.Viper, env environments.Environment, applicationName string) error {
-	// If the application we are deleting is the default application, remove it
-	if env.GetDefaultApplication() == applicationName {
-		envSection, err := cli.ReadEnvironmentSection(config)
-		if err != nil {
-			return err
-		}
-
-		fmt.Printf("Removing default application '%v' from environment '%v'\n", applicationName, env.GetName())
-
-		envSection.Items[cases.Fold().String(env.GetName())][environments.EnvironmentKeyDefaultApplication] = ""
-
-		err = cli.SaveConfigOnLock(ctx, config, cli.UpdateEnvironmentWithLatestConfig(envSection, cli.MergeWithLatestConfig(env.GetName())))
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil

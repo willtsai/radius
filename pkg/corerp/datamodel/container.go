@@ -7,24 +7,38 @@ package datamodel
 
 import (
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
+	"github.com/project-radius/radius/pkg/radrp/outputresource"
+	"github.com/project-radius/radius/pkg/rp"
 )
 
 // ContainerResource represents Container resource.
 type ContainerResource struct {
 	v1.TrackedResource
 
+	// InternalMetadata is the internal metadata which is used for conversion.
+	v1.InternalMetadata
+
 	// SystemData is the systemdata which includes creation/modified dates.
 	SystemData v1.SystemData `json:"systemData,omitempty"`
 	// Properties is the properties of the resource.
 	Properties ContainerProperties `json:"properties"`
-
-	// InternalMetadata is the internal metadata which is used for conversion.
-	v1.InternalMetadata
 }
 
 // ResourceTypeName returns the qualified name of the resource
-func (c ContainerResource) ResourceTypeName() string {
+func (c *ContainerResource) ResourceTypeName() string {
 	return "Applications.Core/containers"
+}
+
+// ApplyDeploymentOutput applies the properties changes based on the deployment output.
+func (c *ContainerResource) ApplyDeploymentOutput(do rp.DeploymentOutput) {
+	c.Properties.Status.OutputResources = do.DeployedOutputResources
+	c.InternalMetadata.ComputedValues = do.ComputedValues
+	c.InternalMetadata.SecretValues = do.SecretValues
+}
+
+// OutputResources returns the output resources array.
+func (c *ContainerResource) OutputResources() []outputresource.OutputResource {
+	return c.Properties.Status.OutputResources
 }
 
 // ContainerProperties represents the properties of Container.
@@ -184,7 +198,7 @@ type Extension struct {
 
 // ManualScalingExtension - ManualScaling Extension
 type ManualScalingExtension struct {
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 }
 
 // DaprSidecarExtension - Specifies the resource should have a Dapr sidecar injected

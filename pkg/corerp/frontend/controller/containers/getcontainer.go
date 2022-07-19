@@ -10,7 +10,6 @@ import (
 	"errors"
 	"net/http"
 
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/corerp/datamodel"
@@ -27,8 +26,8 @@ type GetContainer struct {
 }
 
 // NewGetContainer creates a new instance of GetContainer.
-func NewGetContainer(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &GetContainer{ctrl.NewBaseController(ds, sm)}, nil
+func NewGetContainer(opts ctrl.Options) (ctrl.Controller, error) {
+	return &GetContainer{ctrl.NewBaseController(opts)}, nil
 }
 
 func (e *GetContainer) Run(ctx context.Context, req *http.Request) (rest.Response, error) {

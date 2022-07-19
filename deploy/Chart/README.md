@@ -18,7 +18,7 @@ This chart installs the Radius controller manager, which includes:
 ### There are two ways to install 
 
 - Installing from source. In repo, this is done by invoking `make controller-deploy` or by directly installing the helm chart with `helm upgrade --wait --install --set container=<REGISTRY>/radius-controller --set tag=latest radius deploy/Chart -n radius-system`. `make controller-deploy` will also build and push the radius-controller, which is useful for inner loop development.
-- Invoking `rad env init kubernetes`, which will install the latest released helm chart into your kubernetes cluster.
+- Invoking `rad install kubernetes --reinstall`, which will install the latest released helm chart into your kubernetes cluster.
 
 ### Verify the installation
 
@@ -33,7 +33,11 @@ kubectl get pods -n radius-system
 To uninstall the radius release:
 
 ```
-helm uninstall radius -n radius-system
+rad uninstall kubernetes
 ```
 
-Currently we don't support uninstalling the helm chart via `rad env delete`. This will be addressed in a future release.
+OR
+
+```
+helm uninstall radius -n radius-system
+```

@@ -10,12 +10,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/project-radius/radius/pkg/azure/azresources"
 	"github.com/project-radius/radius/pkg/azure/radclient"
 	"github.com/project-radius/radius/pkg/cli/clients_new/generated"
 	"github.com/project-radius/radius/pkg/cli/output"
 	"github.com/project-radius/radius/pkg/corerp/api/v20220315privatepreview"
 	corerp "github.com/project-radius/radius/pkg/corerp/api/v20220315privatepreview"
+	ucpresources "github.com/project-radius/radius/pkg/ucp/resources"
 )
 
 // NOTE: parameters in the template engine follow the structure:
@@ -38,7 +38,7 @@ type DeploymentParameters = map[string]map[string]interface{}
 // DeploymentOptions is the options passed when deploying an ARM-JSON template.
 type DeploymentOptions struct {
 	// Template is the text of the ARM-JSON template in string form.
-	Template string
+	Template map[string]interface{}
 
 	// Parameters is the set of parameters passed to the deployment.
 	Parameters DeploymentParameters
@@ -57,7 +57,7 @@ const (
 )
 
 type ResourceProgress struct {
-	Resource azresources.ResourceID
+	Resource ucpresources.ID
 	Status   ResourceStatus
 }
 
@@ -67,7 +67,7 @@ type DeploymentOutput struct {
 }
 
 type DeploymentResult struct {
-	Resources []azresources.ResourceID
+	Resources []ucpresources.ID
 	Outputs   map[string]DeploymentOutput
 }
 
@@ -84,7 +84,7 @@ type DiagnosticsClient interface {
 }
 
 type EndpointOptions struct {
-	ResourceID azresources.ResourceID
+	ResourceID ucpresources.ID
 }
 
 type ExposeOptions struct {
@@ -124,6 +124,7 @@ type ApplicationsManagementClient interface {
 	ShowResourceByApplication(ctx context.Context, applicationName string, resourceType string) ([]generated.GenericResource, error)
 	DeleteResource(ctx context.Context, resourceType string, resourceName string) (generated.GenericResourcesDeleteResponse, error)
 	ListApplications(ctx context.Context) ([]v20220315privatepreview.ApplicationResource, error)
+	ShowApplication(ctx context.Context, applicationName string) (corerp.ApplicationResource, error)
 	DeleteApplication(ctx context.Context, applicationName string) (v20220315privatepreview.ApplicationsDeleteResponse, error)
 	ListEnv(ctx context.Context) ([]corerp.EnvironmentResource, error)
 	GetEnvDetails(ctx context.Context, envName string) (corerp.EnvironmentResource, error)

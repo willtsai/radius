@@ -7,6 +7,7 @@ package resources
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 )
 
@@ -97,14 +98,14 @@ func (ri ID) String() string {
 // FindScope function gets the scope type and returns the name for that scope if it exists.
 func (ri ID) FindScope(scopeType string) string {
 	for _, t := range ri.scopeSegments {
-		if t.Type == scopeType {
+		if strings.EqualFold(t.Type, scopeType) {
 			return t.Name
 		}
 	}
 	return ""
 }
 
-// RootScope returns the root-scope (the part before 'providers'). This includes 'ucp:' prefix.
+// RootScope returns the root-scope (the part before 'providers').
 //
 // Examples:
 //	/subscriptions/{guid}/resourceGroups/cool-group
@@ -115,6 +116,31 @@ func (ri ID) RootScope() string {
 		segments = append(segments, t.Type)
 		if t.Name != "" {
 			segments = append(segments, t.Name)
+		}
+	}
+
+	joined := strings.Join(segments, SegmentSeparator)
+	if ri.IsUCPQualfied() {
+		return SegmentSeparator + PlanesSegment + SegmentSeparator + joined
+	}
+
+	return SegmentSeparator + joined
+}
+
+// PlaneScope returns plane or subscription scope without resourceGroup
+//
+// Examples:
+//	/subscriptions/{guid}
+//	/planes/radius/local
+func (ri ID) PlaneScope() string {
+	segments := []string{}
+	for _, t := range ri.scopeSegments {
+		if !strings.EqualFold(t.Type, ResourceGroupsSegment) {
+			segments = append(segments, t.Type)
+			if t.Name != "" {
+				segments = append(segments, t.Name)
+			}
+			break
 		}
 	}
 
@@ -258,12 +284,36 @@ func (ri ID) Append(resourceType TypeSegment) ID {
 	}
 }
 
-// Truncate removes the last type/name pair of the ResourceID. Calling truncate on a top level resource has no effect.
+// Truncate removes the last type/name pair for a resource id or scope id. Calling truncate on a top level resource or scope has no effect.
 func (ri ID) Truncate() ID {
-	if len(ri.typeSegments) < 2 {
-		return ri
+	if len(ri.typeSegments) == 0 && len(ri.scopeSegments) == 0 {
+		return ri // Top level scope already
 	}
 
+	if len(ri.typeSegments) > 0 && len(ri.typeSegments) < 2 {
+		return ri // Top level resource already
+	}
+
+	if len(ri.typeSegments) == 0 {
+		// Truncate the root scope
+		if ri.IsUCPQualfied() {
+			result, err := Parse(MakeUCPID(ri.scopeSegments[0:len(ri.scopeSegments)-1], []TypeSegment{}...))
+			if err != nil {
+				panic(err) // Should not be possible.
+			}
+
+			return result
+		} else {
+			result, err := Parse(MakeRelativeID(ri.scopeSegments[0:len(ri.scopeSegments)-1], []TypeSegment{}...))
+			if err != nil {
+				panic(err) // Should not be possible.
+			}
+
+			return result
+		}
+	}
+
+	// Truncate the resource type
 	if ri.IsUCPQualfied() {
 		result, err := Parse(MakeUCPID(ri.scopeSegments, ri.typeSegments[0:len(ri.typeSegments)-1]...))
 		if err != nil {
@@ -281,27 +331,55 @@ func (ri ID) Truncate() ID {
 	}
 }
 
+// ParseByMethod is a helper function to extract the custom actions from the id.
+// If there is a custom action in the request, then the method will be POST. To be able
+// to get the proper type, we need to remove the custom action from the id.
+func ParseByMethod(id string, method string) (ID, error) {
+	parsedID, err := Parse(id)
+	if err != nil {
+		return ID{}, err
+	}
+
+	if method == http.MethodPost {
+		parsedID = parsedID.Truncate()
+	}
+
+	return parsedID, nil
+}
+
 // Parse parses a resource ID.
 func Parse(id string) (ID, error) {
 	isUCPQualified := false
 	if strings.HasPrefix(id, SegmentSeparator+PlanesSegment) {
 		isUCPQualified = true
 		id = strings.TrimPrefix(id, SegmentSeparator+PlanesSegment)
+
+		// Handles /planes and /planes/
+		if id == "" || id == "/" {
+			normalized := MakeUCPID([]ScopeSegment{}, []TypeSegment{}...)
+			return ID{
+				id:            normalized,
+				scopeSegments: []ScopeSegment{},
+				typeSegments:  []TypeSegment{},
+			}, nil
+		}
 	}
 
-	scopes := []ScopeSegment{}
-	if id == "" && isUCPQualified {
-		normalized := ""
-		if isUCPQualified {
-			normalized = MakeUCPID(scopes, []TypeSegment{}...)
-		} else {
-			normalized = MakeRelativeID(scopes, []TypeSegment{}...)
-		}
+	if id == "/" {
+		normalized := MakeRelativeID([]ScopeSegment{}, []TypeSegment{}...)
 		return ID{
 			id:            normalized,
-			scopeSegments: scopes,
+			scopeSegments: []ScopeSegment{},
 			typeSegments:  []TypeSegment{},
 		}, nil
+	}
+
+	// If UCP forwards a request to the RP, the incoming URL
+	// will not have the UCP Prefix but will have a planes segment
+	isUCPForwarded := false
+	if strings.HasPrefix(id, SegmentSeparator+PlanesSegment) {
+		isUCPForwarded = true
+		id = strings.TrimPrefix(id, SegmentSeparator+PlanesSegment)
 	}
 
 	// trim the leading and ending / so we don't end up with an empty segment - we disallow
@@ -324,6 +402,7 @@ func Parse(id string) (ID, error) {
 	}
 
 	// Parse scopes - iterate until we get to "providers"
+	scopes := []ScopeSegment{}
 
 	i := 0
 	for i < len(segments) {
@@ -343,6 +422,10 @@ func Parse(id string) (ID, error) {
 			return ID{}, invalid(id)
 		}
 
+		if isUCPForwarded && i == 0 {
+			// Add the planes segment to the scope
+			segments[i] = PlanesSegment + SegmentSeparator + segments[i]
+		}
 		scopes = append(scopes, ScopeSegment{Type: segments[i], Name: segments[i+1]})
 		i += 2
 	}

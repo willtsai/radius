@@ -48,7 +48,7 @@ func createContext(t *testing.T) context.Context {
 	return logr.NewContext(context.Background(), logger)
 }
 
-func makeResource(t *testing.T, properties datamodel.ContainerProperties) datamodel.ContainerResource {
+func makeResource(t *testing.T, properties datamodel.ContainerProperties) *datamodel.ContainerResource {
 	resource := datamodel.ContainerResource{
 		TrackedResource: apiv1.TrackedResource{
 			ID:   "/subscriptions/test-sub-id/resourceGroups/test-group/providers/Applications.Core/containers/test-container",
@@ -57,7 +57,7 @@ func makeResource(t *testing.T, properties datamodel.ContainerProperties) datamo
 		},
 		Properties: properties,
 	}
-	return resource
+	return &resource
 }
 
 func makeResourceID(t *testing.T, resourceType string, resourceName string) resources.ID {
@@ -324,7 +324,7 @@ func Test_Render_PortConnectedToRoute(t *testing.T) {
 				"web": {
 					ContainerPort: 5000,
 					Protocol:      datamodel.ProtocolTCP,
-					Provides:      makeResourceID(t, "HttpRoute", "A").String(),
+					Provides:      makeResourceID(t, "httpRoutes", "A").String(),
 				},
 			},
 		},
@@ -340,7 +340,7 @@ func Test_Render_PortConnectedToRoute(t *testing.T) {
 
 	labels := kubernetes.MakeDescriptiveLabels(applicationName, resource.Name)
 	podLabels := kubernetes.MakeDescriptiveLabels(applicationName, resource.Name)
-	podLabels["radius.dev/route-http-a"] = "true"
+	podLabels["radius.dev/route-httproutes-a"] = "true"
 
 	t.Run("verify deployment", func(t *testing.T) {
 		deployment, _ := kubernetes.FindDeployment(output.Resources)
@@ -359,7 +359,7 @@ func Test_Render_PortConnectedToRoute(t *testing.T) {
 		routeID := makeResourceID(t, "HttpRoute", "A")
 
 		expected := v1.ContainerPort{
-			Name:          kubernetes.GetShortenedTargetPortName(applicationName + "HttpRoute" + routeID.Name()),
+			Name:          kubernetes.GetShortenedTargetPortName(applicationName + "httpRoutes" + routeID.Name()),
 			ContainerPort: 5000,
 			Protocol:      v1.ProtocolTCP,
 		}
@@ -400,7 +400,7 @@ func Test_Render_Connections(t *testing.T) {
 	}
 
 	renderer := Renderer{}
-	output, err := renderer.Render(createContext(t), resource, renderers.RenderOptions{Dependencies: dependencies})
+	output, err := renderer.Render(createContext(t), resource, renderers.RenderOptions{Dependencies: dependencies, Environment: renderers.EnvironmentOptions{Namespace: "default"}})
 	require.NoError(t, err)
 	require.Empty(t, output.ComputedValues)
 	require.Empty(t, output.SecretValues)
@@ -455,7 +455,7 @@ func Test_Render_Connections(t *testing.T) {
 		require.Equal(t, outputResource, expectedOutputResource)
 
 		require.Equal(t, resourceName, secret.Name)
-		require.Equal(t, applicationName, secret.Namespace)
+		require.Equal(t, "default", secret.Namespace)
 		require.Equal(t, labels, secret.Labels)
 		require.Empty(t, secret.Annotations)
 
@@ -684,7 +684,7 @@ func Test_Render_AzureConnection(t *testing.T) {
 	require.Len(t, outputResource, 1)
 }
 
-func Test_Render_AzureConnectionMissingRoleError(t *testing.T) {
+func Test_Render_AzureConnectionEmptyRoleAllowed(t *testing.T) {
 	testARMID := makeResourceID(t, "ResourceType", "test-azure-resource").String()
 	properties := datamodel.ContainerProperties{
 		Application: "/subscriptions/test-sub-id/resourceGroups/test-rg/providers/Applications.Core/applications/test-app",
@@ -709,8 +709,7 @@ func Test_Render_AzureConnectionMissingRoleError(t *testing.T) {
 		},
 	}
 	_, err := renderer.Render(createContext(t), resource, renderers.RenderOptions{Dependencies: dependencies})
-	require.Error(t, err)
-	require.Equal(t, "rbac permissions are required to access Azure connections", err.Error())
+	require.NoError(t, err)
 }
 
 func Test_Render_EphemeralVolumes(t *testing.T) {
@@ -827,9 +826,23 @@ func Test_Render_PersistentAzureFileShareVolumes(t *testing.T) {
 	renderOutput, err := renderer.Render(createContext(t), resource, renderers.RenderOptions{Dependencies: dependencies})
 	require.Lenf(t, renderOutput.Resources, 2, "expected 2 output resource, instead got %+v", len(renderOutput.Resources))
 
+	deploymentResource := outputresource.OutputResource{}
+	secretResource := outputresource.OutputResource{}
+	for _, resource := range renderOutput.Resources {
+		if resource.LocalID == outputresource.LocalIDDeployment {
+			deploymentResource = resource
+		}
+
+		if resource.LocalID == outputresource.LocalIDSecret {
+			secretResource = resource
+		}
+	}
+
+	require.NotEmpty(t, deploymentResource)
+	require.NotEmpty(t, secretResource)
+
 	// Verify deployment
-	require.Equal(t, outputresource.LocalIDDeployment, renderOutput.Resources[0].LocalID, "expected output resource of kind deployment instead got :%v", renderOutput.Resources[0].LocalID)
-	volumes := renderOutput.Resources[0].Resource.(*appsv1.Deployment).Spec.Template.Spec.Volumes
+	volumes := deploymentResource.Resource.(*appsv1.Deployment).Spec.Template.Spec.Volumes
 	require.Lenf(t, volumes, 1, "expected 1 volume, instead got %+v", len(volumes))
 	require.Equal(t, tempVolName, volumes[0].Name)
 	require.NotNil(t, volumes[0].VolumeSource.AzureFile, "expected volumesource azurefile to be not nil")
@@ -837,8 +850,7 @@ func Test_Render_PersistentAzureFileShareVolumes(t *testing.T) {
 	require.Equal(t, volumes[0].VolumeSource.AzureFile.ShareName, testShareName)
 
 	// Verify Kubernetes secret
-	require.Equal(t, outputresource.LocalIDSecret, renderOutput.Resources[1].LocalID, "expected output resource of kind secret instead got :%v", renderOutput.Resources[0].LocalID)
-	secret := renderOutput.Resources[1].Resource.(*corev1.Secret)
+	secret := secretResource.Resource.(*corev1.Secret)
 	require.Lenf(t, secret.Data, 2, "expected 2 secret key-value pairs, instead got %+v", len(secret.Data))
 	require.NoError(t, err)
 }

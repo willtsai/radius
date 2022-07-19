@@ -7,9 +7,12 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,9 +21,9 @@ import (
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/asyncoperation/controller"
 	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
-	"github.com/project-radius/radius/pkg/queue"
 	"github.com/project-radius/radius/pkg/radlogger"
 	"github.com/project-radius/radius/pkg/radrp/armerrors"
+	queue "github.com/project-radius/radius/pkg/ucp/queue/client"
 	"github.com/project-radius/radius/pkg/ucp/resources"
 	"github.com/project-radius/radius/pkg/ucp/store"
 	"golang.org/x/sync/semaphore"
@@ -32,24 +35,38 @@ var (
 )
 
 const (
-	// MaxOperationConcurrency is the maximum concurrency to process async request operation.
-	// TOOD: make this concurrency configurable.
-	MaxOperationConcurrency = 3
+	// defaultMaxOperationConcurrency is the default maximum concurrency to process async request operation.
+	defaultMaxOperationConcurrency = 3
 
-	// MaxDequeueCount is the maximum dequeue count which will be retried.
-	MaxDequeueCount = 5
+	// defaultMaxOperationRetryCount is the default maximum retry count to process async operation.
+	defaultMaxOperationRetryCount = 3
 
-	// messageExtendMargin is the margin duration before extending message lock.
-	messageExtendMargin = time.Duration(30) * time.Second
+	// messageExtendMargin is the default margin duration before extending message lock.
+	defaultMessageExtendMargin = time.Duration(30) * time.Second
 
-	// minMessageLockDuration is the minimum duration of message lock duration.
-	minMessageLockDuration = time.Duration(5) * time.Second
+	// minMessageLockDuration is the default minimum duration of message lock duration.
+	defaultMinMessageLockDuration = time.Duration(5) * time.Second
 
-	// deduplicationDuration is the duration for the deduplication detection.
-	deduplicationDuration = time.Duration(30) * time.Second
+	// deduplicationDuration is the default duration for the deduplication detection.
+	defaultDeduplicationDuration = time.Duration(30) * time.Second
 )
 
+// Options configures AsyncRequestProcessorWorker
 type Options struct {
+	// MaxOperationConcurrency is the maximum concurrency to process async request operation.
+	MaxOperationConcurrency int
+
+	// MaxOperationRetryCount is the maximum retry count to process async request operation.
+	MaxOperationRetryCount int
+
+	// MessageExtendMargin is the margin duration for clock skew before extending message lock.
+	MessageExtendMargin time.Duration
+
+	// MinMessageLockDuration is the minimum duration of message lock duration.
+	MinMessageLockDuration time.Duration
+
+	// DeduplicationDuration is the duration for the deduplication detection.
+	DeduplicationDuration time.Duration
 }
 
 // AsyncRequestProcessWorker is the worker to process async requests.
@@ -68,13 +85,28 @@ func New(
 	sm manager.StatusManager,
 	qu queue.Client,
 	ctrlRegistry *ControllerRegistry) *AsyncRequestProcessWorker {
+	if options.MaxOperationConcurrency == 0 {
+		options.MaxOperationConcurrency = defaultMaxOperationConcurrency
+	}
+	if options.MaxOperationRetryCount == 0 {
+		options.MaxOperationRetryCount = defaultMaxOperationRetryCount
+	}
+	if options.MessageExtendMargin == time.Duration(0) {
+		options.MessageExtendMargin = defaultMessageExtendMargin
+	}
+	if options.MinMessageLockDuration == time.Duration(0) {
+		options.MinMessageLockDuration = defaultMinMessageLockDuration
+	}
+	if options.DeduplicationDuration == time.Duration(0) {
+		options.DeduplicationDuration = defaultDeduplicationDuration
+	}
+
 	return &AsyncRequestProcessWorker{
 		options:      options,
 		sm:           sm,
 		registry:     ctrlRegistry,
 		requestQueue: qu,
-
-		sem: semaphore.NewWeighted(MaxOperationConcurrency),
+		sem:          semaphore.NewWeighted(int64(options.MaxOperationConcurrency)),
 	}
 }
 
@@ -82,7 +114,7 @@ func New(
 func (w *AsyncRequestProcessWorker) Start(ctx context.Context) error {
 	logger := logr.FromContextOrDiscard(ctx)
 
-	msgCh, err := w.requestQueue.Dequeue(ctx)
+	msgCh, err := queue.StartDequeuer(ctx, w.requestQueue)
 	if err != nil {
 		return err
 	}
@@ -97,13 +129,19 @@ func (w *AsyncRequestProcessWorker) Start(ctx context.Context) error {
 		go func(msgreq *queue.Message) {
 			defer w.sem.Release(1)
 
-			op := msgreq.Data.(*ctrl.Request)
+			op := &ctrl.Request{}
+			if err := json.Unmarshal(msgreq.Data, op); err != nil {
+				logger.Error(err, "failed to unmarshal queue message.")
+				return
+			}
+
 			opLogger := logger.WithValues(
 				"OperationID", op.OperationID.String(),
 				"OperationType", op.OperationType,
 				"ResourceID", op.ResourceID,
 				"CorrleationID", op.CorrelationID,
 				"W3CTraceID", op.TraceparentID,
+				"DequeueCount", strconv.Itoa(msgreq.DequeueCount),
 			)
 
 			opType, ok := v1.ParseOperationType(op.OperationType)
@@ -112,20 +150,23 @@ func (w *AsyncRequestProcessWorker) Start(ctx context.Context) error {
 				return
 			}
 
-			ctrl := w.registry.Get(opType)
+			asyncCtrl := w.registry.Get(opType)
 
-			if ctrl == nil {
-				opLogger.V(radlogger.Error).Info("Unknown operation")
-				if err := msgreq.Finish(nil); err != nil {
-					logger.Error(err, "failed to finish the message which includes unknown operation.")
+			if asyncCtrl == nil {
+				opLogger.V(radlogger.Error).Info("cannot process the unknown operation: " + opType.String())
+				if err := w.requestQueue.FinishMessage(ctx, msgreq); err != nil {
+					opLogger.Error(err, "failed to finish the message")
 				}
 				return
 			}
-			if msgreq.DequeueCount >= MaxDequeueCount {
-				opLogger.V(radlogger.Error).Info(fmt.Sprintf("Exceed max retrycount: %d", msgreq.DequeueCount))
-				if err := msgreq.Finish(nil); err != nil {
-					logger.Error(err, "failed to finish the message which exceeds the max retry count.")
-				}
+			if msgreq.DequeueCount > w.options.MaxOperationRetryCount {
+				errMsg := fmt.Sprintf("exceeded max retry count to process async operation message: %d", msgreq.DequeueCount)
+				opLogger.V(radlogger.Error).Info(errMsg)
+				failed := ctrl.NewFailedResult(armerrors.ErrorDetails{
+					Code:    armerrors.Internal,
+					Message: errMsg,
+				})
+				w.completeOperation(ctx, msgreq, failed, asyncCtrl.StorageClient())
 				return
 			}
 
@@ -133,9 +174,9 @@ func (w *AsyncRequestProcessWorker) Start(ctx context.Context) error {
 			// 1. The same message is delivered twice in multiple instances.
 			// 2. provisioningState is not matched between resource and operationStatuses
 
-			dup, err := w.isDuplicated(ctx, ctrl.StorageClient(), op.ResourceID, op.OperationID)
+			dup, err := w.isDuplicated(ctx, asyncCtrl.StorageClient(), op.ResourceID, op.OperationID)
 			if err != nil {
-				logger.Error(err, "failed to check potential deduplication.")
+				opLogger.Error(err, "failed to check potential deduplication.")
 				return
 			}
 			if dup {
@@ -143,12 +184,12 @@ func (w *AsyncRequestProcessWorker) Start(ctx context.Context) error {
 				return
 			}
 
-			if err = w.updateResourceAndOperationStatus(ctx, ctrl.StorageClient(), op.ResourceID, op.OperationID, v1.ProvisioningStateUpdating, nil); err != nil {
+			if err = w.updateResourceAndOperationStatus(ctx, asyncCtrl.StorageClient(), op, v1.ProvisioningStateUpdating, nil); err != nil {
 				return
 			}
 
 			opCtx := logr.NewContext(ctx, opLogger)
-			w.runOperation(opCtx, msgreq, ctrl)
+			w.runOperation(opCtx, msgreq, asyncCtrl)
 		}(msg)
 	}
 
@@ -159,7 +200,11 @@ func (w *AsyncRequestProcessWorker) Start(ctx context.Context) error {
 func (w *AsyncRequestProcessWorker) runOperation(ctx context.Context, message *queue.Message, asyncCtrl ctrl.Controller) {
 	logger := logr.FromContextOrDiscard(ctx)
 
-	asyncReq := message.Data.(*ctrl.Request)
+	asyncReq := &ctrl.Request{}
+	if err := json.Unmarshal(message.Data, asyncReq); err != nil {
+		logger.Error(err, "failed to unmarshal queue message.")
+		return
+	}
 	asyncReqCtx, opCancel := context.WithCancel(ctx)
 	// Ensure that asyncReqCtx context is cancelled when runOperation returns.
 	// That is, cancelling asyncReqCtx signals to ctrl.Run() to cancel the execution,
@@ -176,6 +221,12 @@ func (w *AsyncRequestProcessWorker) runOperation(ctx context.Context, message *q
 			if err := recover(); err != nil {
 				msg := fmt.Sprintf("recovering from panic %v: %s", err, debug.Stack())
 				logger.V(radlogger.Fatal).Info(msg)
+
+				// When backend controller has a critical bug such as nil reference, asyncCtrl.Run() is panicking.
+				// If this happens, the message is requeued after message lock time (5 mins).
+				// After message lock is expired, message will be reprocessed 'w.options.MaxOperationRetryCount' times and
+				// then complete the message and change provisioningState to 'Failed'. Meanwhile, PUT request will
+				// be blocked.
 			}
 		}(opDone)
 
@@ -194,17 +245,17 @@ func (w *AsyncRequestProcessWorker) runOperation(ctx context.Context, message *q
 	}()
 
 	operationTimeoutAfter := time.After(asyncReq.Timeout())
-	messageExtendAfter := getMessageExtendDuration(message.NextVisibleAt)
+	messageExtendAfter := w.getMessageExtendDuration(message.NextVisibleAt)
 
 	for {
 		select {
 		case <-time.After(messageExtendAfter):
-			if err := message.Extend(); err != nil {
+			if err := w.requestQueue.ExtendMessage(ctx, message); err != nil {
 				logger.Error(err, "fails to extend message lock")
 			} else {
 				logger.Info("Extended message lock duration.", "NextVisibleTime", message.NextVisibleAt.UTC().String())
 			}
-			messageExtendAfter = getMessageExtendDuration(message.NextVisibleAt)
+			messageExtendAfter = w.getMessageExtendDuration(message.NextVisibleAt)
 
 		case <-operationTimeoutAfter:
 			logger.Info("Cancelling async operation.")
@@ -227,39 +278,48 @@ func (w *AsyncRequestProcessWorker) runOperation(ctx context.Context, message *q
 
 func (w *AsyncRequestProcessWorker) completeOperation(ctx context.Context, message *queue.Message, result ctrl.Result, sc store.StorageClient) {
 	logger := logr.FromContextOrDiscard(ctx)
-	req := message.Data.(*ctrl.Request)
+	req := &ctrl.Request{}
+	if err := json.Unmarshal(message.Data, req); err != nil {
+		logger.Error(err, "failed to unmarshal queue message.")
+		return
+	}
 
-	err := w.updateResourceAndOperationStatus(ctx, sc, req.ResourceID, req.OperationID, result.ProvisioningState(), result.Error)
+	err := w.updateResourceAndOperationStatus(ctx, sc, req, result.ProvisioningState(), result.Error)
 	if err != nil {
+		logger.Error(err, "failed to update resource and/or operation status")
 		return
 	}
 
 	// Finish the message only if Requeue is false. Otherwise, AsyncRequestProcessWorker will requeue the message and process it again.
 	if !result.Requeue {
-		if err := message.Finish(nil); err != nil {
+		if err := w.requestQueue.FinishMessage(ctx, message); err != nil {
 			logger.Error(err, "failed to finish the message")
 		}
 	}
 }
 
-func (w *AsyncRequestProcessWorker) updateResourceAndOperationStatus(ctx context.Context, sc store.StorageClient, resourceID string, operationID uuid.UUID, state v1.ProvisioningState, opErr *armerrors.ErrorDetails) error {
+func (w *AsyncRequestProcessWorker) updateResourceAndOperationStatus(ctx context.Context, sc store.StorageClient, req *ctrl.Request, state v1.ProvisioningState, opErr *armerrors.ErrorDetails) error {
 	logger := logr.FromContextOrDiscard(ctx)
 
-	rID, err := resources.Parse(resourceID)
+	rID, err := resources.Parse(req.ResourceID)
 	if err != nil {
 		logger.Error(err, "failed to parse resource ID")
 		return err
 	}
 
-	if err = updateResourceState(ctx, sc, rID.String(), state); err != nil {
+	opType, _ := v1.ParseOperationType(req.OperationType)
+
+	err = updateResourceState(ctx, sc, rID.String(), state)
+	if err != nil && !(opType.Method == http.MethodDelete && errors.Is(&store.ErrNotFound{}, err)) {
 		logger.Error(err, "failed to update the provisioningState in resource.")
 		return err
 	}
 
+	// Otherwise we update the operationStatus to the result.
 	now := time.Now().UTC()
-	err = w.sm.Update(ctx, rID.RootScope(), operationID, state, &now, opErr)
+	err = w.sm.Update(ctx, rID, req.OperationID, state, &now, opErr)
 	if err != nil {
-		logger.Error(err, "failed to update operationstatus", "OperationID", operationID.String())
+		logger.Error(err, "failed to update operationstatus", "OperationID", req.OperationID.String())
 		return err
 	}
 
@@ -272,23 +332,23 @@ func (w *AsyncRequestProcessWorker) isDuplicated(ctx context.Context, sc store.S
 		return false, err
 	}
 
-	status, err := w.sm.Get(ctx, rID.RootScope(), operationID)
+	status, err := w.sm.Get(ctx, rID, operationID)
 	if err != nil {
 		return false, err
 	}
 
 	if status.Status == v1.ProvisioningStateUpdating && status.LastUpdatedTime.IsZero() &&
-		status.LastUpdatedTime.Add(deduplicationDuration).After(time.Now().UTC()) {
+		status.LastUpdatedTime.Add(w.options.DeduplicationDuration).After(time.Now().UTC()) {
 		return true, nil
 	}
 
 	return false, nil
 }
 
-func getMessageExtendDuration(visibleAt time.Time) time.Duration {
-	d := time.Until(visibleAt.Add(-messageExtendMargin))
+func (w *AsyncRequestProcessWorker) getMessageExtendDuration(visibleAt time.Time) time.Duration {
+	d := time.Until(visibleAt.Add(-w.options.MessageExtendMargin))
 	if d <= 0 {
-		return minMessageLockDuration
+		return w.options.MinMessageLockDuration
 	}
 	return d
 }

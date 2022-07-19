@@ -11,7 +11,6 @@ import (
 	"net/http"
 
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/corerp/datamodel"
@@ -28,8 +27,8 @@ type CreateOrUpdateEnvironment struct {
 }
 
 // NewCreateOrUpdateEnvironment creates a new CreateOrUpdateEnvironment.
-func NewCreateOrUpdateEnvironment(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &CreateOrUpdateEnvironment{ctrl.NewBaseController(ds, sm)}, nil
+func NewCreateOrUpdateEnvironment(opts ctrl.Options) (ctrl.Controller, error) {
+	return &CreateOrUpdateEnvironment{ctrl.NewBaseController(opts)}, nil
 }
 
 // Run executes CreateOrUpdateEnvironment operation.

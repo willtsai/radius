@@ -27,8 +27,8 @@ type GetOperationResult struct {
 }
 
 // NewGetOperationResult creates a new GetOperationResult.
-func NewGetOperationResult(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &GetOperationResult{ctrl.NewBaseController(ds, sm)}, nil
+func NewGetOperationResult(opts ctrl.Options) (ctrl.Controller, error) {
+	return &GetOperationResult{ctrl.NewBaseController(opts)}, nil
 }
 
 // Run returns the response with necessary headers about the async operation.

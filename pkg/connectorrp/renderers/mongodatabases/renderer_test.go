@@ -16,6 +16,7 @@ import (
 	"github.com/project-radius/radius/pkg/handlers"
 	"github.com/project-radius/radius/pkg/radrp/outputresource"
 	"github.com/project-radius/radius/pkg/resourcekinds"
+	"github.com/project-radius/radius/pkg/rp"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,7 +45,7 @@ func Test_Render_Success(t *testing.T) {
 		},
 	}
 
-	output, err := renderer.Render(ctx, mongoDBResource)
+	output, err := renderer.Render(ctx, &mongoDBResource, renderers.RenderOptions{})
 	require.NoError(t, err)
 
 	require.Len(t, output.Resources, 2)
@@ -105,7 +106,7 @@ func Test_Render_UserSpecifiedSecrets(t *testing.T) {
 		},
 	}
 
-	output, err := renderer.Render(ctx, mongoDBResource)
+	output, err := renderer.Render(ctx, &mongoDBResource, renderers.RenderOptions{})
 	require.NoError(t, err)
 	require.Len(t, output.Resources, 0)
 
@@ -116,7 +117,7 @@ func Test_Render_UserSpecifiedSecrets(t *testing.T) {
 	}
 	require.Equal(t, expectedComputedValues, output.ComputedValues)
 
-	expectedSecretValues := map[string]renderers.SecretValueReference{
+	expectedSecretValues := map[string]rp.SecretValueReference{
 		renderers.ConnectionStringValue: {Value: connectionString},
 		renderers.UsernameStringValue:   {Value: userName},
 		renderers.PasswordStringHolder:  {Value: password},
@@ -142,7 +143,7 @@ func Test_Render_NoResourceSpecified(t *testing.T) {
 		},
 	}
 
-	output, err := renderer.Render(ctx, mongoDBResource)
+	output, err := renderer.Render(ctx, &mongoDBResource, renderers.RenderOptions{})
 	require.NoError(t, err)
 	require.Equal(t, 0, len(output.Resources))
 }
@@ -164,7 +165,7 @@ func Test_Render_InvalidResourceModel(t *testing.T) {
 		},
 	}
 
-	_, err := renderer.Render(ctx, mongoDBResource)
+	_, err := renderer.Render(ctx, &mongoDBResource, renderers.RenderOptions{})
 	require.Error(t, err)
 	require.Equal(t, "invalid model conversion", err.Error())
 }
@@ -188,7 +189,7 @@ func Test_Render_InvalidSourceResourceIdentifier(t *testing.T) {
 		},
 	}
 
-	_, err := renderer.Render(ctx, mongoDBResource)
+	_, err := renderer.Render(ctx, &mongoDBResource, renderers.RenderOptions{})
 	require.Error(t, err)
 	require.Equal(t, "the 'resource' field must be a valid resource id", err.Error())
 }
@@ -212,7 +213,7 @@ func Test_Render_InvalidResourceType(t *testing.T) {
 		},
 	}
 
-	_, err := renderer.Render(ctx, mongoDBResource)
+	_, err := renderer.Render(ctx, &mongoDBResource, renderers.RenderOptions{})
 	require.Error(t, err)
 	require.Equal(t, "the 'resource' field must refer to a CosmosDB Mongo Database", err.Error())
 }

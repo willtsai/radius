@@ -12,7 +12,6 @@ import (
 	"time"
 
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/corerp/datamodel"
@@ -34,8 +33,8 @@ type DeleteGateway struct {
 }
 
 // NewDeleteGateway creates a new DeleteGateway.
-func NewDeleteGateway(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &DeleteGateway{ctrl.NewBaseController(ds, sm)}, nil
+func NewDeleteGateway(opts ctrl.Options) (ctrl.Controller, error) {
+	return &DeleteGateway{ctrl.NewBaseController(opts)}, nil
 }
 
 func (dc *DeleteGateway) Run(ctx context.Context, req *http.Request) (rest.Response, error) {
@@ -60,7 +59,7 @@ func (dc *DeleteGateway) Run(ctx context.Context, req *http.Request) (rest.Respo
 		return rest.NewPreconditionFailedResponse(serviceCtx.ResourceID.String(), err.Error()), nil
 	}
 
-	err = dc.AsyncOperation.QueueAsyncOperation(ctx, serviceCtx, AsyncDeleteGatewayOperationTimeout)
+	err = dc.StatusManager().QueueAsyncOperation(ctx, serviceCtx, AsyncDeleteGatewayOperationTimeout)
 	if err != nil {
 		existingGateway.Properties.ProvisioningState = v1.ProvisioningStateFailed
 		_, rbErr := dc.SaveResource(ctx, serviceCtx.ResourceID.String(), existingGateway, etag)
@@ -73,5 +72,5 @@ func (dc *DeleteGateway) Run(ctx context.Context, req *http.Request) (rest.Respo
 	existingGateway.Properties.ProvisioningState = v1.ProvisioningStateDeleting
 
 	return rest.NewAsyncOperationResponse(existingGateway, existingGateway.TrackedResource.Location, http.StatusAccepted,
-		serviceCtx.ResourceID, serviceCtx.OperationID), nil
+		serviceCtx.ResourceID, serviceCtx.OperationID, serviceCtx.APIVersion), nil
 }

@@ -10,7 +10,6 @@ import (
 	"errors"
 	"net/http"
 
-	manager "github.com/project-radius/radius/pkg/armrpc/asyncoperation/statusmanager"
 	ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
 	"github.com/project-radius/radius/pkg/armrpc/servicecontext"
 	"github.com/project-radius/radius/pkg/connectorrp/datamodel"
@@ -26,8 +25,8 @@ type DeleteMongoDatabase struct {
 }
 
 // NewDeleteMongoDatabase creates a new instance DeleteMongoDatabase.
-func NewDeleteMongoDatabase(ds store.StorageClient, sm manager.StatusManager) (ctrl.Controller, error) {
-	return &DeleteMongoDatabase{ctrl.NewBaseController(ds, sm)}, nil
+func NewDeleteMongoDatabase(opts ctrl.Options) (ctrl.Controller, error) {
+	return &DeleteMongoDatabase{ctrl.NewBaseController(opts)}, nil
 }
 
 func (mongo *DeleteMongoDatabase) Run(ctx context.Context, req *http.Request) (rest.Response, error) {
@@ -52,7 +51,12 @@ func (mongo *DeleteMongoDatabase) Run(ctx context.Context, req *http.Request) (r
 		return rest.NewPreconditionFailedResponse(serviceCtx.ResourceID.String(), err.Error()), nil
 	}
 
-	err = mongo.DataStore.Delete(ctx, serviceCtx.ResourceID.String())
+	err = mongo.DeploymentProcessor().Delete(ctx, serviceCtx.ResourceID, existingResource.Properties.Status.OutputResources)
+	if err != nil {
+		return nil, err
+	}
+
+	err = mongo.StorageClient().Delete(ctx, serviceCtx.ResourceID.String())
 	if err != nil {
 		if errors.Is(&store.ErrNotFound{}, err) {
 			return rest.NewNoContentResponse(), nil
