@@ -29,6 +29,8 @@ import (
 	"github.com/project-radius/radius/pkg/renderers/volumev1alpha3"
 	"github.com/project-radius/radius/pkg/resourcekinds"
 	"github.com/project-radius/radius/pkg/resourcemodel"
+
+	ttv2 "github.com/servicemeshinterface/smi-sdk-go/pkg/apis/access/v1alpha2"
 )
 
 const (
@@ -232,9 +234,44 @@ func (r Renderer) makeDeployment(ctx context.Context, options renderers.RenderOp
 	// and return them.
 	secretData := map[string][]byte{}
 
+	outputResources := []outputresource.OutputResource{}
+
 	// Take each connection and create environment variables for each part
 	for name, con := range cc.Connections {
+
 		properties := dependencies[to.String(con.Source)]
+		// HERE: Create a traffic target based off the properties of the dependency
+		// TODO in new world, should be fairly similar
+		trafficTarget := ttv2.TrafficTarget{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "TrafficTarget",
+				APIVersion: "split.smi-spec.io/v1alpha2",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      resource.ResourceName,
+				Namespace: resource.ApplicationName,
+				Labels:    kubernetes.MakeDescriptiveLabels(resource.ApplicationName, resource.ResourceName),
+			},
+			Spec: ttv2.TrafficTargetSpec{
+				Sources: []ttv2.IdentityBindingSubject{
+					{
+						Kind:      "ServiceAccount",
+						Name:      kubernetes.MakeResourceName(resource.ApplicationName, properties.ResourceID.Name()),
+						Namespace: resource.ApplicationName,
+					},
+				},
+				Destination: ttv2.IdentityBindingSubject{
+					Kind:      "ServiceAccount",
+					Name:      kubernetes.MakeResourceName(resource.ApplicationName, resource.ResourceName),
+					Namespace: resource.ApplicationName,
+				},
+			},
+		}
+
+		ttOutput := outputresource.NewKubernetesOutputResource("TrafficTarget", "TrafficTarget", &trafficTarget, trafficTarget.ObjectMeta)
+
+		outputResources = append(outputResources, ttOutput)
+
 		for key, value := range properties.ComputedValues {
 			name := fmt.Sprintf("%s_%s_%s", "CONNECTION", strings.ToUpper(name), strings.ToUpper(key))
 
@@ -270,8 +307,6 @@ func (r Renderer) makeDeployment(ctx context.Context, options renderers.RenderOp
 	for _, key := range getSortedKeys(env) {
 		container.Env = append(container.Env, env[key])
 	}
-
-	outputResources := []outputresource.OutputResource{}
 
 	podLabels := kubernetes.MakeDescriptiveLabels(resource.ApplicationName, resource.ResourceName)
 
@@ -400,6 +435,22 @@ func (r Renderer) makeDeployment(ctx context.Context, options renderers.RenderOp
 
 	output := outputresource.NewKubernetesOutputResource(resourcekinds.Deployment, outputresource.LocalIDDeployment, &deployment, deployment.ObjectMeta)
 	outputResources = append(outputResources, output)
+
+	serviceAccount := corev1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubernetes.MakeResourceName(resource.ApplicationName, resource.ResourceName),
+			Namespace: resource.ApplicationName,
+			Labels:    kubernetes.MakeDescriptiveLabels(resource.ApplicationName, resource.ResourceName),
+		},
+	}
+
+	serviceAccountOutput := outputresource.NewKubernetesOutputResource("ServiceAccount", "ServiceAccount", &serviceAccount, serviceAccount.ObjectMeta)
+	outputResources = append(outputResources, serviceAccountOutput)
+
 	return outputResources, secretData, nil
 }
 
