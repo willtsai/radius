@@ -37,6 +37,7 @@ func (src *HTTPRouteResource) ConvertTo() (conv.DataModelInterface, error) {
 			Scheme:            to.String(src.Properties.Scheme),
 			URL:               to.String(src.Properties.URL),
 			Routes:            routes,
+			ContainerPort:     to.Int32(src.Properties.ContainerPort),
 		},
 		InternalMetadata: v1.InternalMetadata{
 			UpdatedAPIVersion: Version,
@@ -76,6 +77,7 @@ func (dst *HTTPRouteResource) ConvertFrom(src conv.DataModelInterface) error {
 		Scheme:            to.StringPtr(route.Properties.Scheme),
 		URL:               to.StringPtr(route.Properties.URL),
 		Routes:            routes,
+		ContainerPort:     to.Int32Ptr(route.Properties.ContainerPort),
 	}
 
 	return nil
