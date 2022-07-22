@@ -83,6 +83,13 @@ func setup(t *testing.T) SharedMocks {
 				},
 				ResourceHandler: resourceHandler,
 			},
+			{
+				ResourceType: resourcemodel.ResourceType{
+					Type:     resourcekinds.ServiceAccount,
+					Provider: providers.ProviderKubernetes,
+				},
+				ResourceHandler: resourceHandler,
+			},
 		},
 		map[string]bool{
 			providers.ProviderKubernetes: true,

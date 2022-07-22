@@ -30,6 +30,8 @@ import (
 	"github.com/project-radius/radius/pkg/resourcekinds"
 	"github.com/project-radius/radius/pkg/resourcemodel"
 	"github.com/project-radius/radius/pkg/ucp/resources"
+	ttv3 "github.com/servicemeshinterface/smi-sdk-go/pkg/apis/access/v1alpha3"
+	specv4 "github.com/servicemeshinterface/smi-sdk-go/pkg/apis/specs/v1alpha4"
 )
 
 const (
@@ -174,7 +176,7 @@ func (r Renderer) makeDeployment(ctx context.Context, resource datamodel.Contain
 
 	dependencies := options.Dependencies
 	cc := resource.Properties
-
+	outputResources := []outputresource.OutputResource{}
 	ports := []corev1.ContainerPort{}
 	for _, port := range cc.Container.Ports {
 		if provides := port.Provides; provides != "" {
@@ -200,6 +202,25 @@ func (r Renderer) makeDeployment(ctx context.Context, resource datamodel.Contain
 				ContainerPort: port.ContainerPort,
 				Protocol:      corev1.ProtocolTCP,
 			})
+			serviceAccount := corev1.ServiceAccount{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ServiceAccount",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      kubernetes.MakeResourceName(applicationName, resourceId.Name()),
+					Namespace: options.Environment.Namespace,
+					Labels:    kubernetes.MakeDescriptiveLabels(applicationName, resourceId.Name()),
+				},
+				// ObjectMeta: metav1.ObjectMeta{
+				// 	Name:      kubernetes.MakeResourceName(applicationName, resource.Name),
+				// 	Namespace: options.Environment.Namespace,
+				// 	Labels:    kubernetes.MakeDescriptiveLabels(applicationName, resource.Name),
+				// },
+			}
+
+			serviceAccountOutput := outputresource.NewKubernetesOutputResource("ServiceAccount", "ServiceAccount", &serviceAccount, serviceAccount.ObjectMeta)
+			outputResources = append(outputResources, serviceAccountOutput)
 		} else {
 			ports = append(ports, corev1.ContainerPort{
 				ContainerPort: port.ContainerPort,
@@ -236,7 +257,11 @@ func (r Renderer) makeDeployment(ctx context.Context, resource datamodel.Contain
 	// We build the environment variable list in a stable order for testability
 	// For the values that come from connections we back them with secretData. We'll extract the values
 	// and return them.
-	env, secretData := getEnvVarsAndSecretData(resource, dependencies)
+	env, secretData, ttoutputResources := getEnvVarsAndSecretData(resource, dependencies, applicationName, options)
+
+	for _, tt := range ttoutputResources {
+		outputResources = append(outputResources, tt)
+	}
 
 	for k, v := range cc.Container.Env {
 		env[k] = corev1.EnvVar{Name: k, Value: v}
@@ -246,8 +271,6 @@ func (r Renderer) makeDeployment(ctx context.Context, resource datamodel.Contain
 	for _, key := range getSortedKeys(env) {
 		container.Env = append(container.Env, env[key])
 	}
-
-	outputResources := []outputresource.OutputResource{}
 
 	podLabels := kubernetes.MakeDescriptiveLabels(applicationName, resource.Name)
 
@@ -375,21 +398,88 @@ func (r Renderer) makeDeployment(ctx context.Context, resource datamodel.Contain
 	}
 
 	deploymentOutput := outputresource.NewKubernetesOutputResource(resourcekinds.Deployment, outputresource.LocalIDDeployment, &deployment, deployment.ObjectMeta)
+
 	return deploymentOutput, outputResources, secretData, nil
 }
 
-func getEnvVarsAndSecretData(resource datamodel.ContainerResource, dependencies map[string]renderers.RendererDependency) (map[string]corev1.EnvVar, map[string][]byte) {
+func getEnvVarsAndSecretData(resource datamodel.ContainerResource, dependencies map[string]renderers.RendererDependency, applicationName string, options renderers.RenderOptions) (map[string]corev1.EnvVar, map[string][]byte, []outputresource.OutputResource) {
 	env := map[string]corev1.EnvVar{}
 	secretData := map[string][]byte{}
 	cc := resource.Properties
 
+	outputResources := []outputresource.OutputResource{}
 	// Take each connection and create environment variables for each part
 	// We'll store each value in a secret named with the same name as the resource.
 	// We'll use the environment variable names as keys.
 	// Float is used by the JSON serializer
 	for name, con := range cc.Connections {
-		properties := dependencies[con.Source]
-		for key, value := range properties.ComputedValues {
+		destinationProperties := dependencies[con.Source]
+		for _, port := range cc.Container.Ports {
+			if provides := port.Provides; provides != "" {
+				resourceId, err := resources.Parse(provides)
+				if err != nil {
+					return nil, nil, outputResources
+				}
+				routeGroup := specv4.HTTPRouteGroup{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "HTTPRouteGroup",
+						APIVersion: "specs.smi-spec.io/v1alpha4",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      kubernetes.MakeResourceName(applicationName, resourceId.Name()),
+						Namespace: options.Environment.Namespace,
+						Labels:    kubernetes.MakeDescriptiveLabels(applicationName, resourceId.Name()),
+					},
+					Spec: specv4.HTTPRouteGroupSpec{
+						Matches: []specv4.HTTPMatch{
+							{
+								Name:      "everything",
+								Methods:   []string{"*"},
+								PathRegex: ".*",
+							},
+						},
+					},
+				}
+				routeGroupOutput := outputresource.NewKubernetesOutputResource("HTTPRouteGroup", "HTTPRouteGroup", &routeGroup, routeGroup.ObjectMeta)
+				outputResources = append(outputResources, routeGroupOutput)
+				trafficTarget := ttv3.TrafficTarget{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "TrafficTarget",
+						APIVersion: "access.smi-spec.io/v1alpha3",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      resourceId.Name(), // resource.Name,
+						Namespace: options.Environment.Namespace,
+						Labels:    kubernetes.MakeDescriptiveLabels(applicationName, resourceId.Name()),
+					},
+					Spec: ttv3.TrafficTargetSpec{
+						Sources: []ttv3.IdentityBindingSubject{
+							{
+								Kind:      "ServiceAccount",
+								Name:      kubernetes.MakeResourceName(applicationName, resourceId.Name()),
+								Namespace: options.Environment.Namespace,
+							},
+						},
+						Destination: ttv3.IdentityBindingSubject{
+							Kind:      "ServiceAccount",
+							Name:      kubernetes.MakeResourceName(applicationName, destinationProperties.ResourceID.Name()),
+							Namespace: options.Environment.Namespace,
+						},
+						Rules: []ttv3.TrafficTargetRule{
+							{
+								Kind: "HTTPRouteGroup",
+								Name: kubernetes.MakeResourceName(applicationName, resourceId.Name()),
+							},
+						},
+					},
+				}
+
+				ttOutput := outputresource.NewKubernetesOutputResource("TrafficTarget", "TrafficTarget", &trafficTarget, trafficTarget.ObjectMeta)
+				outputResources = append(outputResources, ttOutput)
+			}
+		}
+
+		for key, value := range destinationProperties.ComputedValues {
 			name := fmt.Sprintf("%s_%s_%s", "CONNECTION", strings.ToUpper(name), strings.ToUpper(key))
 
 			source := corev1.EnvVarSource{
@@ -414,7 +504,7 @@ func getEnvVarsAndSecretData(resource datamodel.ContainerResource, dependencies 
 		}
 	}
 
-	return env, secretData
+	return env, secretData, outputResources
 }
 
 func (r Renderer) makeEphemeralVolume(volumeName string, volume *datamodel.EphemeralVolume) (corev1.Volume, corev1.VolumeMount, error) {

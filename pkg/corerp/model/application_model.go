@@ -135,6 +135,20 @@ func NewApplicationModel(arm *armauth.ArmConfig, k8sClient client.Client, k8sCli
 		},
 		{
 			ResourceType: resourcemodel.ResourceType{
+				Type:     resourcekinds.TrafficTarget,
+				Provider: providers.ProviderKubernetes,
+			},
+			ResourceHandler: handlers.NewKubernetesHandler(k8sClient, k8sClientSet),
+		},
+		{
+			ResourceType: resourcemodel.ResourceType{
+				Type:     resourcekinds.ServiceAccount,
+				Provider: providers.ProviderKubernetes,
+			},
+			ResourceHandler: handlers.NewKubernetesHandler(k8sClient, k8sClientSet),
+		},
+		{
+			ResourceType: resourcemodel.ResourceType{
 				Type:     "TrafficSplit",
 				Provider: providers.ProviderKubernetes,
 			},

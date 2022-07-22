@@ -35,4 +35,6 @@ const (
 	AzureFileShare                   = "azure.fileshare"
 	AzureFileShareStorageAccount     = "azure.fileshare.account"
 	TrafficSplit                     = "TrafficSplit"
+	TrafficTarget                    = "TrafficTarget"
+	ServiceAccount                   = "ServiceAccount"
 )
