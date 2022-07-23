@@ -37,4 +37,5 @@ const (
 	TrafficSplit                     = "TrafficSplit"
 	TrafficTarget                    = "TrafficTarget"
 	ServiceAccount                   = "ServiceAccount"
+	HTTPRouteGroup                   = "HTTPRouteGroup"
 )

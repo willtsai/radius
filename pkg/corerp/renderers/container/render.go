@@ -448,7 +448,7 @@ func getEnvVarsAndSecretData(resource datamodel.ContainerResource, dependencies 
 						APIVersion: "access.smi-spec.io/v1alpha3",
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceId.Name(), // resource.Name,
+						Name:      kubernetes.MakeResourceName(applicationName, resourceId.Name()), // resource.Name,
 						Namespace: options.Environment.Namespace,
 						Labels:    kubernetes.MakeDescriptiveLabels(applicationName, resourceId.Name()),
 					},
