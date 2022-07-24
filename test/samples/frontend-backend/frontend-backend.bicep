@@ -3,9 +3,6 @@ import radius as radius
 @description('Specifies the location for resources.')
 param location string = 'global'
 
-@description('Specifies the image of the container resource.')
-param image string = 'radiusdev.azurecr.io/magpiego:latest'
-
 @description('Specifies the environment for resources.')
 param environment string
 
@@ -64,16 +61,18 @@ resource frontend 'Applications.Core/containers@2022-03-15-privatepreview' = {
         }
       }
       env: {
-        // for this example, populate values with existing stuff still populating 
+        // Always set these environment variables to show
+        // the frontend failing to connect when a "connection" isn't present
         CONNECTION__BACKEND__HOSTNAME: backendhttp.properties['hostname']
         CONNECTION__BACKEND__PORT: '${backendhttp.properties.port}'
       }
     }
-    connections: {
-      backend: {
-        source: backendhttp.id
-      }
-    }
+    // Uncomment me to allow connection between frontend and backend
+    // connections: {
+    //   backend: {
+    //     source: backendhttp.id
+    //   }
+    // }
   }
 }
 

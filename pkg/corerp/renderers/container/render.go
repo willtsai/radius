@@ -178,6 +178,8 @@ func (r Renderer) makeDeployment(ctx context.Context, resource datamodel.Contain
 	cc := resource.Properties
 	outputResources := []outputresource.OutputResource{}
 	ports := []corev1.ContainerPort{}
+	var serviceAccountName string
+
 	for _, port := range cc.Container.Ports {
 		if provides := port.Provides; provides != "" {
 			resourceId, err := resources.Parse(provides)
@@ -218,6 +220,8 @@ func (r Renderer) makeDeployment(ctx context.Context, resource datamodel.Contain
 				// 	Labels:    kubernetes.MakeDescriptiveLabels(applicationName, resource.Name),
 				// },
 			}
+
+			serviceAccountName = kubernetes.MakeResourceName(applicationName, resourceId.Name())
 
 			serviceAccountOutput := outputresource.NewKubernetesOutputResource("ServiceAccount", "ServiceAccount", &serviceAccount, serviceAccount.ObjectMeta)
 			outputResources = append(outputResources, serviceAccountOutput)
@@ -390,8 +394,9 @@ func (r Renderer) makeDeployment(ctx context.Context, resource datamodel.Contain
 					Labels: podLabels,
 				},
 				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{container},
-					Volumes:    volumes,
+					Containers:         []corev1.Container{container},
+					Volumes:            volumes,
+					ServiceAccountName: serviceAccountName,
 				},
 			},
 		},
@@ -469,6 +474,9 @@ func getEnvVarsAndSecretData(resource datamodel.ContainerResource, dependencies 
 							{
 								Kind: "HTTPRouteGroup",
 								Name: kubernetes.MakeResourceName(applicationName, resourceId.Name()),
+								Matches: []string{
+									"everything",
+								},
 							},
 						},
 					},
