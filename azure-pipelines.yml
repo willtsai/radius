@@ -114,7 +114,7 @@ stages:
       displayName: az account set 
     - script: |
         az group create \
-          --location westus \
+          --location australiaeast \
           --name $(INTEGRATION_TEST_RESOURCE_GROUP_NAME) \
           --subscription ${{ variables.INTEGRATION_TEST_SUBSCRIPTION_ID }}  
         while [ $(az group exists --name $(INTEGRATION_TEST_RESOURCE_GROUP_NAME)) = false ]; do sleep 2; done
