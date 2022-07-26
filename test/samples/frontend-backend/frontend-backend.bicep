@@ -7,7 +7,7 @@ param location string = 'global'
 param environment string
 
 resource app 'Applications.Core/applications@2022-03-15-privatepreview' = {
-  name: 'corerp-resources-container-httproute'
+  name: 'corerp-resources-container-traffictarget'
   location: location
   properties: {
     environment: environment
@@ -68,11 +68,11 @@ resource frontend 'Applications.Core/containers@2022-03-15-privatepreview' = {
       }
     }
     // Uncomment me to allow connection between frontend and backend
-    // connections: {
-    //   backend: {
-    //     source: backendhttp.id
-    //   }
-    // }
+    connections: {
+      backend: {
+        source: backendhttp.id
+      }
+    }
   }
 }
 
