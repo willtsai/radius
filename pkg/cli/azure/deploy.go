@@ -60,7 +60,8 @@ func (dc *ResouceDeploymentClient) Deploy(ctx context.Context, options clients.D
 
 		wg.Add(1)
 		go func() {
-			_ = dc.monitorProgress(ctx, name, options.ProgressChan)
+			innererr := dc.monitorProgress(ctx, name, options.ProgressChan)
+			fmt.Println(innererr.Error())
 			wg.Done()
 		}()
 	}
