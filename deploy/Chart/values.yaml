@@ -1,7 +1,7 @@
 global:
   engine:
     image: radius.azurecr.io/deployment-engine
-    tag: latest
+    tag: pr-204
   extensibility:
     image: radius.azurecr.io/bicep-extensibility
     tag: latest
