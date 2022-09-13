@@ -13,8 +13,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudcontrol"
 	"github.com/google/uuid"
 	radrprest "github.com/project-radius/radius/pkg/armrpc/rest"
+	"github.com/project-radius/radius/pkg/middleware"
 	awserror "github.com/project-radius/radius/pkg/ucp/aws"
 	ctrl "github.com/project-radius/radius/pkg/ucp/frontend/controller"
+	"github.com/project-radius/radius/pkg/ucp/resources"
 	"github.com/project-radius/radius/pkg/ucp/rest"
 	"github.com/wI2L/jsondiff"
 )
@@ -32,16 +34,15 @@ func NewCreateOrUpdateAWSResource(opts ctrl.Options) (ctrl.Controller, error) {
 }
 
 func (p *CreateOrUpdateAWSResource) Run(ctx context.Context, w http.ResponseWriter, req *http.Request) (rest.Response, error) {
-	client, resourceType, id, err := ParseAWSRequest(ctx, p.Options.BasePath, req)
-	if err != nil {
-		return nil, err
-	}
+	resourceType := ctx.Value(middleware.AWSResourceTypeKey).(string)
+	client := ctx.Value(middleware.AWSClientKey).(*cloudcontrol.Client)
+	id := ctx.Value(middleware.AWSResourceID).(resources.ID)
 
 	decoder := json.NewDecoder(req.Body)
 	defer req.Body.Close()
 
 	body := map[string]interface{}{}
-	err = decoder.Decode(&body)
+	err := decoder.Decode(&body)
 	if err != nil {
 		e := rest.ErrorResponse{
 			Error: rest.ErrorDetails{
