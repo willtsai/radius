@@ -135,6 +135,11 @@ func Register(ctx context.Context, router *mux.Router, ctrlOpts ctrl.Options) er
 			Method:         v1.OperationDelete,
 			HandlerFactory: resourcegroups_ctrl.NewDeleteResourceGroup,
 		},
+		{
+			ParentRouter:   resourceGroupSubRouter.Path("/resources").Subrouter(),
+			Method:         v1.OperationGet,
+			HandlerFactory: resourcegroups_ctrl.NewGetResourceGroup,
+		},
 
 		// AWS Plane handlers
 		{

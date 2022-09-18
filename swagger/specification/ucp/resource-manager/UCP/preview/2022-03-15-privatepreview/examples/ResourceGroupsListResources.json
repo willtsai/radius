@@ -1,0 +1,22 @@
+{
+  "parameters": {
+    "planeType": "radius",
+    "planeName": "local",
+    "resourceGroupName": "rg1"
+  },
+  "responses": {
+    "200": {
+      "body": {
+        "values": [
+          {
+            "id": "/planes/radius/local/resourceGroups/rg1/providers/Applications.Core/applications/test-app",
+            "name": "test-app",
+            "type": "Applications.Core/applications",
+            "location": "global",
+            "tags": {}
+          }
+        ]
+      }
+    }
+  }
+}

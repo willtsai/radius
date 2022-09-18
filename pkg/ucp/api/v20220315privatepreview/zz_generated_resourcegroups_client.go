@@ -256,3 +256,58 @@ func (client *ResourceGroupsClient) listHandleResponse(resp *http.Response) (Res
 	return result, nil
 }
 
+// ListResources - List tracked resources in a resource group.
+// If the operation fails it returns an *azcore.ResponseError type.
+// Generated from API version 2022-03-15-privatepreview
+// planeType - The type of the plane
+// planeName - The name of the plane
+// resourceGroupName - The name of the resource group
+// options - ResourceGroupsClientListResourcesOptions contains the optional parameters for the ResourceGroupsClient.ListResources
+// method.
+func (client *ResourceGroupsClient) ListResources(ctx context.Context, planeType string, planeName string, resourceGroupName string, options *ResourceGroupsClientListResourcesOptions) (ResourceGroupsClientListResourcesResponse, error) {
+	req, err := client.listResourcesCreateRequest(ctx, planeType, planeName, resourceGroupName, options)
+	if err != nil {
+		return ResourceGroupsClientListResourcesResponse{}, err
+	}
+	resp, err := client.pl.Do(req)
+	if err != nil {
+		return ResourceGroupsClientListResourcesResponse{}, err
+	}
+	if !runtime.HasStatusCode(resp, http.StatusOK) {
+		return ResourceGroupsClientListResourcesResponse{}, runtime.NewResponseError(resp)
+	}
+	return client.listResourcesHandleResponse(resp)
+}
+
+// listResourcesCreateRequest creates the ListResources request.
+func (client *ResourceGroupsClient) listResourcesCreateRequest(ctx context.Context, planeType string, planeName string, resourceGroupName string, options *ResourceGroupsClientListResourcesOptions) (*policy.Request, error) {
+	urlPath := "/planes/{planeType}/{planeName}/resourcegroups/{resourceGroupName}/resources"
+	if planeType == "" {
+		return nil, errors.New("parameter planeType cannot be empty")
+	}
+	urlPath = strings.ReplaceAll(urlPath, "{planeType}", url.PathEscape(planeType))
+	if planeName == "" {
+		return nil, errors.New("parameter planeName cannot be empty")
+	}
+	urlPath = strings.ReplaceAll(urlPath, "{planeName}", url.PathEscape(planeName))
+	if resourceGroupName == "" {
+		return nil, errors.New("parameter resourceGroupName cannot be empty")
+	}
+	urlPath = strings.ReplaceAll(urlPath, "{resourceGroupName}", url.PathEscape(resourceGroupName))
+	req, err := runtime.NewRequest(ctx, http.MethodGet, runtime.JoinPaths(client.host, urlPath))
+	if err != nil {
+		return nil, err
+	}
+	req.Raw().Header["Accept"] = []string{"application/json"}
+	return req, nil
+}
+
+// listResourcesHandleResponse handles the ListResources response.
+func (client *ResourceGroupsClient) listResourcesHandleResponse(resp *http.Response) (ResourceGroupsClientListResourcesResponse, error) {
+	result := ResourceGroupsClientListResourcesResponse{}
+	if err := runtime.UnmarshalAsJSON(resp, &result.TrackedResourceList); err != nil {
+		return ResourceGroupsClientListResourcesResponse{}, err
+	}
+	return result, nil
+}
+

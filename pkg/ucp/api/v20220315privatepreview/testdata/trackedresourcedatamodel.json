@@ -1,0 +1,9 @@
+{
+    "id": "/planes/radius/local/resourceGroups/radius-test-rg/providers/Applications.Core/applications/test-app",
+    "name": "test-app",
+    "type": "Applications.Core/applications",
+    "location": "global",
+    "tags": {
+        "tag-name": "tag-value"
+    }
+}

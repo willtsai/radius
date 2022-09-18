@@ -25,6 +25,8 @@ func Test_ParseInvalidIDs(t *testing.T) {
 		"/subscriptions/{%s}/resourceGroups/providers/Microsoft.CustomProviders/resourceProviders",
 		"/planes/radius",
 		"/planes/radius/local/resourceGroups//providers/Microsoft.CustomProviders/resourceProviders",
+		"/planes/radius/local/resourceGroups/test-rg/Microsoft.CustomProviders/resourceProviders",
+		"/planes/radius/local/resourceGroups/test-rg/resources/Microsoft.CustomProviders/resourceProviders",
 	}
 
 	for i, v := range values {
@@ -301,6 +303,17 @@ func Test_ParseValidIDs(t *testing.T) {
 			types:    []TypeSegment{},
 			provider: "",
 			kind:     kindscopecollection,
+		},
+		{
+			id:       "/planes/radius/local/resourceGroups/r1/resources",
+			expected: "/planes/radius/local/resourceGroups/r1/resources",
+			scopes: []ScopeSegment{
+				{Type: "radius", Name: "local"},
+				{Type: "resourceGroups", Name: "r1"},
+				{Type: "resources", Name: ""},
+			},
+			types:    []TypeSegment{},
+			provider: "",
 		},
 		{
 			id:       "/planes/radius/local/resourceGroups/r1/providers/Applications.Core/environments/env",

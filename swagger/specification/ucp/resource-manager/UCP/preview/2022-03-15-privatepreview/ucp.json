@@ -363,6 +363,48 @@
             }
           }
         }
+      },
+      "/planes/{planeType}/{planeName}/resourcegroups/{resourceGroupName}/resources": {
+        "get": {
+          "description": "List tracked resources in a resource group.",
+          "operationId": "ResourceGroups_ListResources",
+          "produces": [
+            "application/json"
+          ],
+          "x-ms-examples": {
+            "UCPResourceGroupsResourceList": {
+              "$ref": "./examples/ResourceGroupsListResources.json"
+            }
+          },
+          "tags": [
+            "ResourceGroups"
+          ],
+          "parameters": [
+            {
+              "$ref": "#/parameters/PlaneTypeParameter"
+            },
+            {
+              "$ref": "#/parameters/PlaneNameParameter"
+            },
+            {
+              "$ref": "#/parameters/ResourceGroupNameParameter"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Operation completed successfully.",
+              "schema": {
+                "$ref": "#/definitions/TrackedResourceList"
+              }
+            },
+            "default": {
+              "description": "Error response describing why the operation failed.",
+              "schema": {
+                "$ref": "#/definitions/ErrorResponse"
+              }
+            }
+          }
+        }
       }
     },
     "definitions": {
@@ -449,6 +491,25 @@
             "$ref": "../../../../../common-types/resource-management/v2/types.json#/definitions/TrackedResource"
           }
         ]
+      },
+      "TrackedResourceList": {
+        "description": "The list of tracked resouces in a resource group.",
+        "type": "object",
+        "properties": {
+          "value": {
+            "description": "The list of resource groups.",
+            "type": "array",
+            "items": {
+              "$ref": "../../../../../common-types/resource-management/v2/types.json#/definitions/TrackedResource"
+            }
+          }
+        }
+      },
+      "ResourceGroupName": {
+        "type": "string",
+        "description": "The name of the resource group",
+        "pattern": "^[a-z]([-a-z0-9]*[a-z0-9])?$",
+        "maxLength": 63
       },
       "ErrorDetail": {
         "description": "The error detail.",

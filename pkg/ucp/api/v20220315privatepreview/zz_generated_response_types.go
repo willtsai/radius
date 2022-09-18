@@ -44,6 +44,11 @@ type ResourceGroupsClientGetResponse struct {
 	ResourceGroupResource
 }
 
+// ResourceGroupsClientListResourcesResponse contains the response from method ResourceGroupsClient.ListResources.
+type ResourceGroupsClientListResourcesResponse struct {
+	TrackedResourceList
+}
+
 // ResourceGroupsClientListResponse contains the response from method ResourceGroupsClient.List.
 type ResourceGroupsClientListResponse struct {
 	ResourceGroupResourceList

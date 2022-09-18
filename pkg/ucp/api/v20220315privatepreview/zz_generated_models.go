@@ -144,6 +144,11 @@ type ResourceGroupsClientListOptions struct {
 	// placeholder for future optional parameters
 }
 
+// ResourceGroupsClientListResourcesOptions contains the optional parameters for the ResourceGroupsClient.ListResources method.
+type ResourceGroupsClientListResourcesOptions struct {
+	// placeholder for future optional parameters
+}
+
 // TrackedResource - The resource model definition for an Azure Resource Manager tracked top level resource which has 'tags'
 // and a 'location'
 type TrackedResource struct {
@@ -161,5 +166,11 @@ type TrackedResource struct {
 
 	// READ-ONLY; The type of the resource. E.g. "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts"
 	Type *string `json:"type,omitempty" azure:"ro"`
+}
+
+// TrackedResourceList - The list of tracked resouces in a resource group.
+type TrackedResourceList struct {
+	// The list of resource groups.
+	Value []*TrackedResource `json:"value,omitempty"`
 }
 
