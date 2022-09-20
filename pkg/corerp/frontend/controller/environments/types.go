@@ -7,4 +7,7 @@ package environments
 
 const (
 	ResourceTypeName = "Applications.Core/environments"
+
+	// User defined operation names
+	OperationListRecipe = "LISTRECIPES"
 )

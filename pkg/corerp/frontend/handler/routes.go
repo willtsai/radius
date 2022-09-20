@@ -105,6 +105,12 @@ func AddRoutes(ctx context.Context, router *mux.Router, pathBase string, isARM b
 			HandlerFactory: env_ctrl.NewDeleteEnvironment,
 		},
 		{
+			ParentRouter:   envResourceRouter.PathPrefix("/listrecipes").Subrouter(),
+			ResourceType:   env_ctrl.ResourceTypeName,
+			Method:         env_ctrl.OperationListRecipe,
+			HandlerFactory: env_ctrl.NewListRecipesEnvironment,
+		},
+		{
 			ParentRouter: hrtSubrouter,
 			ResourceType: hrt_ctrl.ResourceTypeName,
 			Method:       v1.OperationList,
