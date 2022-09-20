@@ -15,7 +15,6 @@ import (
 	radrprest "github.com/project-radius/radius/pkg/armrpc/rest"
 	awserror "github.com/project-radius/radius/pkg/ucp/aws"
 	ctrl "github.com/project-radius/radius/pkg/ucp/frontend/controller"
-	"github.com/project-radius/radius/pkg/ucp/resources"
 	"github.com/project-radius/radius/pkg/ucp/rest"
 	"github.com/wI2L/jsondiff"
 )
@@ -33,15 +32,13 @@ func NewCreateOrUpdateAWSResource(opts ctrl.Options) (ctrl.Controller, error) {
 }
 
 func (p *CreateOrUpdateAWSResource) Run(ctx context.Context, w http.ResponseWriter, req *http.Request) (rest.Response, error) {
-	resourceType := ctx.Value(AWSResourceTypeKey).(string)
-	client := ctx.Value(AWSClientKey).(*cloudcontrol.Client)
-	id := ctx.Value(AWSResourceID).(resources.ID)
+	client, resourceType, id, err := ParseAWSRequest(ctx, p.Options.BasePath, req)
 
 	decoder := json.NewDecoder(req.Body)
 	defer req.Body.Close()
 
 	body := map[string]interface{}{}
-	err := decoder.Decode(&body)
+	err = decoder.Decode(&body)
 	if err != nil {
 		e := rest.ErrorResponse{
 			Error: rest.ErrorDetails{
@@ -65,8 +62,6 @@ func (p *CreateOrUpdateAWSResource) Run(ctx context.Context, w http.ResponseWrit
 			properties = pp
 		}
 	}
-
-	properties["Name"] = id.Name()
 
 	// Create and update work differently for AWS - we need to know if the resource
 	// we're working on exists already.

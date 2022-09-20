@@ -6,7 +6,6 @@ package awsproxy
 
 import (
 	"context"
-	"fmt"
 	http "net/http"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -16,14 +15,12 @@ import (
 	radrprest "github.com/project-radius/radius/pkg/armrpc/rest"
 	awserror "github.com/project-radius/radius/pkg/ucp/aws"
 	ctrl "github.com/project-radius/radius/pkg/ucp/frontend/controller"
-	"github.com/project-radius/radius/pkg/ucp/resources"
 	"github.com/project-radius/radius/pkg/ucp/rest"
-	"github.com/project-radius/radius/pkg/ucp/ucplog"
 )
 
 var _ ctrl.Controller = (*GetAWSOperationResults)(nil)
 
-// GetAWSOperationResults is the controller implementation to delete AWS resource.
+// GetAWSOperationResults is the controller implementation to get AWS resource operation results.
 type GetAWSOperationResults struct {
 	ctrl.BaseController
 }
@@ -34,8 +31,10 @@ func NewGetAWSOperationResults(opts ctrl.Options) (ctrl.Controller, error) {
 }
 
 func (p *GetAWSOperationResults) Run(ctx context.Context, w http.ResponseWriter, req *http.Request) (rest.Response, error) {
-	client := ctx.Value(AWSClientKey).(*cloudcontrol.Client)
-	id := ctx.Value(AWSResourceID).(resources.ID)
+	client, _, id, err := ParseAWSRequest(ctx, p.Options.BasePath, req)
+	if err != nil {
+		return nil, err
+	}
 
 	response, err := client.GetResourceRequestStatus(ctx, &cloudcontrol.GetResourceRequestStatusInput{
 		RequestToken: aws.String(id.Name()),
@@ -46,18 +45,8 @@ func (p *GetAWSOperationResults) Run(ctx context.Context, w http.ResponseWriter,
 		return awserror.HandleAWSError(err)
 	}
 
-	isTerminal := false
-	switch response.ProgressEvent.OperationStatus {
-	case types.OperationStatusSuccess:
-		isTerminal = true
-	case types.OperationStatusCancelComplete:
-		isTerminal = true
-	case types.OperationStatusFailed:
-		isTerminal = true
-	}
+	isTerminal := isStatusTerminal(response)
 
-	logger := ucplog.GetLogger(ctx)
-	logger.Info(fmt.Sprintf("SCHEME operationResults: Setting Location to %s", req.URL.String()))
 	if !isTerminal {
 		headers := map[string]string{
 			"Location":    req.URL.String(),
@@ -67,4 +56,17 @@ func (p *GetAWSOperationResults) Run(ctx context.Context, w http.ResponseWriter,
 	}
 
 	return rest.NewNoContentResponse(), nil
+}
+
+func isStatusTerminal(response *cloudcontrol.GetResourceRequestStatusOutput) bool {
+	isTerminal := false
+	switch response.ProgressEvent.OperationStatus {
+	case types.OperationStatusSuccess:
+		isTerminal = true
+	case types.OperationStatusCancelComplete:
+		isTerminal = true
+	case types.OperationStatusFailed:
+		isTerminal = true
+	}
+	return isTerminal
 }

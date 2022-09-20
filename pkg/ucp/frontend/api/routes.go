@@ -79,12 +79,7 @@ func Register(ctx context.Context, router *mux.Router, ctrlOpts ctrl.Options) er
 	resourceGroupCollectionSubRouter := router.Path(fmt.Sprintf("%s%s", baseURL, resourceGroupCollectionPath)).Subrouter()
 	resourceGroupSubRouter := router.Path(fmt.Sprintf("%s%s", baseURL, resourceGroupItemPath)).Subrouter()
 
-	awsParser, err := awsproxy_ctrl.NewAWSParser(ctrlOpts)
-	if err != nil {
-		return err
-	}
 	awsResourcesSubRouter := router.PathPrefix(fmt.Sprintf("%s%s", baseURL, awsPlaneType)).Subrouter()
-	awsResourcesSubRouter.Use(awsParser.Parse)
 	awsOperationStatusesSubRouter := awsResourcesSubRouter.PathPrefix(awsOperationStatusesPath).Subrouter()
 	awsOperationResultsSubRouter := awsResourcesSubRouter.PathPrefix(awsOperationResultsPath).Subrouter()
 

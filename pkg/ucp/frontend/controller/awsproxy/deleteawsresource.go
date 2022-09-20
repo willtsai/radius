@@ -14,7 +14,6 @@ import (
 	radrprest "github.com/project-radius/radius/pkg/armrpc/rest"
 	awserror "github.com/project-radius/radius/pkg/ucp/aws"
 	ctrl "github.com/project-radius/radius/pkg/ucp/frontend/controller"
-	"github.com/project-radius/radius/pkg/ucp/resources"
 	"github.com/project-radius/radius/pkg/ucp/rest"
 )
 
@@ -31,11 +30,12 @@ func NewDeleteAWSResource(opts ctrl.Options) (ctrl.Controller, error) {
 }
 
 func (p *DeleteAWSResource) Run(ctx context.Context, w http.ResponseWriter, req *http.Request) (rest.Response, error) {
-	resourceType := ctx.Value(AWSResourceTypeKey).(string)
-	client := ctx.Value(AWSClientKey).(*cloudcontrol.Client)
-	id := ctx.Value(AWSResourceID).(resources.ID)
+	client, resourceType, id, err := ParseAWSRequest(ctx, p.Options.BasePath, req)
+	if err != nil {
+		return nil, err
+	}
 
-	_, err := client.GetResource(ctx, &cloudcontrol.GetResourceInput{
+	_, err = client.GetResource(ctx, &cloudcontrol.GetResourceInput{
 		TypeName:   &resourceType,
 		Identifier: aws.String(id.Name()),
 	})

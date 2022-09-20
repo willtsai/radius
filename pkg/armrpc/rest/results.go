@@ -18,7 +18,6 @@ import (
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
 	"github.com/project-radius/radius/pkg/radlogger"
 	"github.com/project-radius/radius/pkg/ucp/resources"
-	"github.com/project-radius/radius/pkg/ucp/ucplog"
 )
 
 const (
@@ -246,10 +245,6 @@ func (r *AsyncOperationResponse) Apply(ctx context.Context, w http.ResponseWrite
 
 	locationHeader := r.getAsyncLocationPath(req, "operationResults")
 	azureAsyncOpHeader := r.getAsyncLocationPath(req, "operationStatuses")
-
-	logger := ucplog.GetLogger(ctx)
-	logger.Info(fmt.Sprintf("SCHEME AsyncOperationResponse: Setting Location to %s", locationHeader))
-	logger.Info(fmt.Sprintf("SCHEME AsyncOperationResponse: Setting Azure-AsyncOperation to %s", azureAsyncOpHeader))
 
 	// Write Headers
 	w.Header().Add("Content-Type", "application/json")

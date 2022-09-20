@@ -30,9 +30,10 @@ func NewGetOrListAWSResource(opts ctrl.Options) (ctrl.Controller, error) {
 }
 
 func (p *GetOrListAWSResource) Run(ctx context.Context, w http.ResponseWriter, req *http.Request) (rest.Response, error) {
-	resourceType := ctx.Value(AWSResourceTypeKey).(string)
-	client := ctx.Value(AWSClientKey).(*cloudcontrol.Client)
-	id := ctx.Value(AWSResourceID).(resources.ID)
+	client, resourceType, id, err := ParseAWSRequest(ctx, p.Options.BasePath, req)
+	if err != nil {
+		return nil, err
+	}
 
 	if id.IsCollection() {
 		return p.listAWSResources(ctx, resourceType, client, id)
