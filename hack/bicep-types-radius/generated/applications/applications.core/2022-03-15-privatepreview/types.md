@@ -60,6 +60,11 @@
 * **tags**: [TrackedResourceTags](#trackedresourcetags): Resource tags.
 * **type**: 'Applications.Core/httpRoutes' (ReadOnly, DeployTimeConstant): The resource type
 
+## Function listRecipes (Applications.Core/environments@2022-03-15-privatepreview)
+* **Resource**: Applications.Core/environments
+* **ApiVersion**: 2022-03-15-privatepreview
+* **Output**: [EnvironmentListRecipesResult](#environmentlistrecipesresult)
+
 ## ApplicationProperties
 ### Properties
 * **environment**: string (Required): The resource id of the environment linked to application.
@@ -281,4 +286,9 @@
 ### Properties
 ### Additional Properties
 * **Additional Properties Type**: string
+
+## EnvironmentListRecipesResult
+### Properties
+### Additional Properties
+* **Additional Properties Type**: [EnvironmentRecipeProperties](#environmentrecipeproperties)
 

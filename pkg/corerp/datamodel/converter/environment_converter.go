@@ -47,3 +47,22 @@ func EnvironmentDataModelFromVersioned(content []byte, version string) (*datamod
 		return nil, v1.ErrUnsupportedAPIVersion
 	}
 }
+
+// EnvironmentRecipesDataModelToVersioned converts recipe name/version agnostic EnvironmentRecipeProperties datamodel map to versioned model map.
+func EnvironmentRecipesDataModelToVersioned(recipesMap map[string]*datamodel.EnvironmentRecipeProperties, version string) (map[string]conv.VersionedModelInterface, error) {
+	switch version {
+	case v20220315privatepreview.Version:
+		versionedMap := make(map[string]conv.VersionedModelInterface)
+		for name, model := range recipesMap {
+			versioned := &v20220315privatepreview.EnvironmentRecipeProperties{}
+			err := versioned.ConvertFrom(model)
+			if err != nil {
+				return nil, err
+			}
+			versionedMap[name] = versioned
+		}
+		return versionedMap, nil
+	default:
+		return nil, v1.ErrUnsupportedAPIVersion
+	}
+}

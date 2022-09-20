@@ -248,6 +248,55 @@ func (client *EnvironmentsClient) listByScopeHandleResponse(resp *http.Response)
 	return result, nil
 }
 
+// ListRecipes - Lists recipes linked to the specified Environment
+// If the operation fails it returns an *azcore.ResponseError type.
+// Generated from API version 2022-03-15-privatepreview
+// environmentName - The name of the environment
+// options - EnvironmentsClientListRecipesOptions contains the optional parameters for the EnvironmentsClient.ListRecipes
+// method.
+func (client *EnvironmentsClient) ListRecipes(ctx context.Context, environmentName string, options *EnvironmentsClientListRecipesOptions) (EnvironmentsClientListRecipesResponse, error) {
+	req, err := client.listRecipesCreateRequest(ctx, environmentName, options)
+	if err != nil {
+		return EnvironmentsClientListRecipesResponse{}, err
+	}
+	resp, err := client.pl.Do(req)
+	if err != nil {
+		return EnvironmentsClientListRecipesResponse{}, err
+	}
+	if !runtime.HasStatusCode(resp, http.StatusOK) {
+		return EnvironmentsClientListRecipesResponse{}, runtime.NewResponseError(resp)
+	}
+	return client.listRecipesHandleResponse(resp)
+}
+
+// listRecipesCreateRequest creates the ListRecipes request.
+func (client *EnvironmentsClient) listRecipesCreateRequest(ctx context.Context, environmentName string, options *EnvironmentsClientListRecipesOptions) (*policy.Request, error) {
+	urlPath := "/{rootScope}/providers/Applications.Core/environments/{environmentName}/listRecipes"
+	urlPath = strings.ReplaceAll(urlPath, "{rootScope}", client.rootScope)
+	if environmentName == "" {
+		return nil, errors.New("parameter environmentName cannot be empty")
+	}
+	urlPath = strings.ReplaceAll(urlPath, "{environmentName}", url.PathEscape(environmentName))
+	req, err := runtime.NewRequest(ctx, http.MethodPost, runtime.JoinPaths(client.host, urlPath))
+	if err != nil {
+		return nil, err
+	}
+	reqQP := req.Raw().URL.Query()
+	reqQP.Set("api-version", "2022-03-15-privatepreview")
+	req.Raw().URL.RawQuery = reqQP.Encode()
+	req.Raw().Header["Accept"] = []string{"application/json"}
+	return req, nil
+}
+
+// listRecipesHandleResponse handles the ListRecipes response.
+func (client *EnvironmentsClient) listRecipesHandleResponse(resp *http.Response) (EnvironmentsClientListRecipesResponse, error) {
+	result := EnvironmentsClientListRecipesResponse{}
+	if err := runtime.UnmarshalAsJSON(resp, &result.Value); err != nil {
+		return EnvironmentsClientListRecipesResponse{}, err
+	}
+	return result, nil
+}
+
 // Update - Update the properties of an existing Environment.
 // If the operation fails it returns an *azcore.ResponseError type.
 // Generated from API version 2022-03-15-privatepreview

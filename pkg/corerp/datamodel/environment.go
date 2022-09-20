@@ -60,3 +60,7 @@ type EnvironmentRecipeProperties struct {
 	ConnectorType string `json:"connectorType,omitempty"`
 	TemplatePath  string `json:"templatePath,omitempty"`
 }
+
+func (envRecipes EnvironmentRecipeProperties) ResourceTypeName() string {
+	return "Applications.Core/Environments"
+}

@@ -271,6 +271,48 @@
             }
           }
         }
+      },
+      "/{rootScope}/providers/Applications.Core/environments/{environmentName}/listRecipes": {
+        "post": {
+          "description": "Lists recipes linked to the specified Environment",
+          "operationId": "Environments_listRecipes",
+          "produces": [
+            "application/json"
+          ],
+          "x-ms-examples": {
+            "RadiusEnvironmentsListRecipes": {
+              "$ref": "./examples/EnvironmentsListRecipes.json"
+            }
+          },
+          "tags": [
+            "Environments"
+          ],
+          "parameters": [
+            {
+              "$ref": "../../../../../common-types/resource-management/v2/types.json#/parameters/ApiVersionParameter"
+            },
+            {
+              "$ref": "global.json#/parameters/RootScopeParameter"
+            },
+            {
+              "$ref": "#/parameters/EnvironmentNameParameter"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Environment recipes",
+              "schema": {
+                "$ref": "#/definitions/EnvironmentListRecipesResult"
+              }
+            },
+            "default": {
+              "description": "Error response describing the reason for operation failure",
+              "schema": {
+                "$ref": "../../../../../common-types/resource-management/v2/types.json#/definitions/ErrorResponse"
+              }
+            }
+          }
+        }
       }
     },
     "definitions": {
@@ -389,6 +431,14 @@
           "connectorType",
           "templatePath"
         ]
+      },
+      "EnvironmentListRecipesResult": {
+        "description": "Name/Properties map of recipes linked to the given Environment",
+        "additionalProperties": {
+          "$ref": "#/definitions/EnvironmentRecipeProperties",
+          "description": "Specifies Recipe linked to the Environment."
+        },
+        "type": "object"
       }
     },
     "parameters": {

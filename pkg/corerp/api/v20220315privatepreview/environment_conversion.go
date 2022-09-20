@@ -154,3 +154,25 @@ func fromEnvironmentComputeKind(kind datamodel.EnvironmentComputeKind) *string {
 
 	return &k
 }
+
+// ConvertFrom converts from version-agnostic datamodel to the versioned EnvironmentRecipeProperties instance.
+func (dst *EnvironmentRecipeProperties) ConvertFrom(src conv.DataModelInterface) error {
+	envRecipeProperties, ok := src.(*datamodel.EnvironmentRecipeProperties)
+	if !ok {
+		return conv.ErrInvalidModelConversion
+	}
+
+	dst.ConnectorType = to.StringPtr(envRecipeProperties.ConnectorType)
+	dst.TemplatePath = to.StringPtr(envRecipeProperties.TemplatePath)
+
+	return nil
+}
+
+// ConvertTo converts from the versioned EnvironmentRecipeProperties instance to version-agnostic datamodel.
+func (src *EnvironmentRecipeProperties) ConvertTo() (conv.DataModelInterface, error) {
+	converted := &datamodel.EnvironmentRecipeProperties{
+		ConnectorType: to.String(src.ConnectorType),
+		TemplatePath:  to.String(src.TemplatePath),
+	}
+	return converted, nil
+}

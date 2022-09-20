@@ -79,6 +79,12 @@ type EnvironmentsClientListByScopeResponse struct {
 	EnvironmentResourceList
 }
 
+// EnvironmentsClientListRecipesResponse contains the response from method EnvironmentsClient.ListRecipes.
+type EnvironmentsClientListRecipesResponse struct {
+	// Name/Properties map of recipes linked to the given Environment
+	Value map[string]*EnvironmentRecipeProperties
+}
+
 // EnvironmentsClientUpdateResponse contains the response from method EnvironmentsClient.Update.
 type EnvironmentsClientUpdateResponse struct {
 	EnvironmentResource
