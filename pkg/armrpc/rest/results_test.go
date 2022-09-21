@@ -184,7 +184,7 @@ func TestGetAsyncLocationPath(t *testing.T) {
 			require.NoError(t, err)
 
 			body := &datamodel.ContainerResource{}
-			r := NewAsyncOperationResponse(body, tt.loc, http.StatusAccepted, resourceID, tt.opID, tt.av)
+			r := NewAsyncOperationResponse(body, tt.loc, http.StatusAccepted, resourceID, tt.opID, tt.av, "", "")
 
 			req := httptest.NewRequest("GET", tt.base, nil)
 			w := httptest.NewRecorder()

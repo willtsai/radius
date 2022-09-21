@@ -109,7 +109,7 @@ func (e *CreateOrUpdateGateway) Run(ctx context.Context, req *http.Request) (res
 	}
 
 	return rest.NewAsyncOperationResponse(newResource, newResource.TrackedResource.Location, respCode,
-		serviceCtx.ResourceID, serviceCtx.OperationID, serviceCtx.APIVersion), nil
+		serviceCtx.ResourceID, serviceCtx.OperationID, serviceCtx.APIVersion, "", ""), nil
 
 }
 

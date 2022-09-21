@@ -112,7 +112,7 @@ func (e *CreateOrUpdateContainer) Run(ctx context.Context, req *http.Request) (r
 	}
 
 	return rest.NewAsyncOperationResponse(newResource, newResource.TrackedResource.Location, respCode,
-		serviceCtx.ResourceID, serviceCtx.OperationID, serviceCtx.APIVersion), nil
+		serviceCtx.ResourceID, serviceCtx.OperationID, serviceCtx.APIVersion, "", ""), nil
 }
 
 // Validate extracts versioned resource from request and validate the properties.

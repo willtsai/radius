@@ -220,12 +220,12 @@ type AsyncOperationResponse struct {
 	ResourceID  resources.ID
 	OperationID uuid.UUID
 	APIVersion  string
-	RootScope   string
-	PathBase    string
+	RootScope   string // Everything before providers namespace for constructing an Async operation header. Used for AWS planes
+	PathBase    string // Base Path. Used for AWS planes
 }
 
 // NewAsyncOperationResponse creates an AsyncOperationResponse
-func NewAsyncOperationResponse(body interface{}, location string, code int, resourceID resources.ID, operationID uuid.UUID, apiVersion string) Response {
+func NewAsyncOperationResponse(body interface{}, location string, code int, resourceID resources.ID, operationID uuid.UUID, apiVersion string, rootScope string, pathBase string) Response {
 	return &AsyncOperationResponse{
 		Body:        body,
 		Location:    location,
@@ -233,6 +233,8 @@ func NewAsyncOperationResponse(body interface{}, location string, code int, reso
 		ResourceID:  resourceID,
 		OperationID: operationID,
 		APIVersion:  apiVersion,
+		RootScope:   rootScope,
+		PathBase:    pathBase,
 	}
 }
 

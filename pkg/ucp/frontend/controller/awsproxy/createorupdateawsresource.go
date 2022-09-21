@@ -159,8 +159,6 @@ func (p *CreateOrUpdateAWSResource) Run(ctx context.Context, w http.ResponseWrit
 		}
 	}
 
-	resp := radrprest.NewAsyncOperationResponse(responseBody, "global", 201, id, operation, "")
-	resp.(*radrprest.AsyncOperationResponse).RootScope = id.RootScope()
-	resp.(*radrprest.AsyncOperationResponse).PathBase = p.Options.BasePath
+	resp := radrprest.NewAsyncOperationResponse(responseBody, "global", 201, id, operation, "", id.RootScope(), p.Options.BasePath)
 	return resp, nil
 }

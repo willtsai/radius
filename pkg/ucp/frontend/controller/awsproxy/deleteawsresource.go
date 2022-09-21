@@ -58,8 +58,6 @@ func (p *DeleteAWSResource) Run(ctx context.Context, w http.ResponseWriter, req 
 		return nil, err
 	}
 
-	resp := radrprest.NewAsyncOperationResponse(map[string]interface{}{}, "global", 202, id, operation, "")
-	resp.(*radrprest.AsyncOperationResponse).RootScope = id.RootScope()
-	resp.(*radrprest.AsyncOperationResponse).PathBase = p.Options.BasePath
+	resp := radrprest.NewAsyncOperationResponse(map[string]interface{}{}, "global", 202, id, operation, "", id.RootScope(), p.Options.BasePath)
 	return resp, nil
 }
