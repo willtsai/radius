@@ -246,3 +246,82 @@ func Test_ListAWSResourcesEmpty(t *testing.T) {
 	require.NoError(t, err)
 	assert.DeepEqual(t, expectedResponse, actualResponse)
 }
+
+func Test_ListAWSResourcesUnknownError(t *testing.T) {
+	ctx, cancel := testcontext.New(t)
+	defer cancel()
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockStorageClient := store.NewMockStorageClient(mockCtrl)
+
+	mockClient := awstypes.NewMockAWSClient(mockCtrl)
+	mockClient.EXPECT().ListResources(gomock.Any(), gomock.Any()).Return(nil, errors.New("something bad happened"))
+
+	id, err := resources.ParseByMethod("/planes/aws/aws/accounts/11234/regions/us-west-2/providers/AWS.Kinesis/Stream", "GET")
+	require.NoError(t, err)
+
+	ctx = context.WithValue(ctx, AWSClientKey, mockClient)
+	ctx = context.WithValue(ctx, AWSResourceTypeKey, "AWS.Kinesis/Stream")
+	ctx = context.WithValue(ctx, AWSResourceID, id)
+
+	awsController, err := NewGetOrListAWSResource(ctrl.Options{
+		DB: mockStorageClient,
+	})
+	require.NoError(t, err)
+
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+
+	require.NoError(t, err)
+	actualResponse, err := awsController.Run(ctx, nil, request)
+
+	require.Error(t, err)
+	require.Nil(t, actualResponse)
+	require.Equal(t, "something bad happened", err.Error())
+}
+
+func Test_ListAWSResourceSmithyError(t *testing.T) {
+	ctx, cancel := testcontext.New(t)
+	defer cancel()
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockStorageClient := store.NewMockStorageClient(mockCtrl)
+
+	mockClient := awstypes.NewMockAWSClient(mockCtrl)
+	mockClient.EXPECT().ListResources(gomock.Any(), gomock.Any()).Return(nil, &smithy.OperationError{
+		Err: &smithyhttp.ResponseError{
+			Err: &smithy.GenericAPIError{
+				Code:    "NotFound",
+				Message: "Resource not found",
+			},
+		},
+	})
+
+	id, err := resources.ParseByMethod("/planes/aws/aws/accounts/11234/regions/us-west-2/providers/AWS.Kinesis/Stream", "GET")
+	require.NoError(t, err)
+
+	ctx = context.WithValue(ctx, AWSClientKey, mockClient)
+	ctx = context.WithValue(ctx, AWSResourceTypeKey, "AWS.Kinesis/Stream")
+	ctx = context.WithValue(ctx, AWSResourceID, id)
+
+	awsController, err := NewGetOrListAWSResource(ctrl.Options{
+		DB: mockStorageClient,
+	})
+	require.NoError(t, err)
+
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+
+	require.NoError(t, err)
+	actualResponse, err := awsController.Run(ctx, nil, request)
+
+	expectedResponse := rest.NewInternalServerErrorARMResponse(rest.ErrorResponse{
+		Error: rest.ErrorDetails{
+			Code:    "NotFound",
+			Message: "Resource not found",
+		},
+	})
+
+	require.NoError(t, err)
+	assert.DeepEqual(t, expectedResponse, actualResponse)
+}
