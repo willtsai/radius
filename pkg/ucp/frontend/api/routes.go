@@ -23,12 +23,14 @@ import (
 
 // TODO: Use variables and construct the path as we add more APIs.
 const (
-	planeCollectionPath      = "/planes"
-	awsPlaneType             = "/planes/aws"
-	planeItemPath            = "/planes/{PlaneType}/{PlaneID}"
-	planeCollectionByType    = "/planes/{PlaneType}"
-	awsOperationResultsPath  = "/{AWSPlaneName}/accounts/{AccountID}/regions/{Region}/providers/{Provider}/locations/{Location}/operationResults/{operationID}"
-	awsOperationStatusesPath = "/{AWSPlaneName}/accounts/{AccountID}/regions/{Region}/providers/{Provider}/locations/{Location}/operationStatuses/{operationID}"
+	planeCollectionPath       = "/planes"
+	awsPlaneType              = "/planes/aws"
+	planeItemPath             = "/planes/{PlaneType}/{PlaneID}"
+	planeCollectionByType     = "/planes/{PlaneType}"
+	awsOperationResultsPath   = "/{AWSPlaneName}/accounts/{AccountID}/regions/{Region}/providers/{Provider}/locations/{Location}/operationResults/{operationID}"
+	awsOperationStatusesPath  = "/{AWSPlaneName}/accounts/{AccountID}/regions/{Region}/providers/{Provider}/locations/{Location}/operationStatuses/{operationID}"
+	awsResourceCollectionPath = "/{AWSPlaneName}/accounts/{AccountID}/regions/{Region}/providers/{Provider}/{ResourceType}"
+	awsResourcePath           = "/{AWSPlaneName}/accounts/{AccountID}/regions/{Region}/providers/{Provider}/{ResourceType}/{ResourceName}"
 )
 
 var resourceGroupCollectionPath = fmt.Sprintf("%s/%s", planeItemPath, "resource{[gG]}roups")
@@ -80,6 +82,8 @@ func Register(ctx context.Context, router *mux.Router, ctrlOpts ctrl.Options) er
 	resourceGroupSubRouter := router.Path(fmt.Sprintf("%s%s", baseURL, resourceGroupItemPath)).Subrouter()
 
 	awsResourcesSubRouter := router.PathPrefix(fmt.Sprintf("%s%s", baseURL, awsPlaneType)).Subrouter()
+	awsResourceCollectionSubRouter := awsResourcesSubRouter.Path(fmt.Sprintf("%s", awsResourceCollectionPath)).Subrouter()
+	awsSingleResourceSubRouter := awsResourcesSubRouter.Path(fmt.Sprintf("%s", awsResourcePath)).Subrouter()
 	awsOperationStatusesSubRouter := awsResourcesSubRouter.PathPrefix(awsOperationStatusesPath).Subrouter()
 	awsOperationResultsSubRouter := awsResourcesSubRouter.PathPrefix(awsOperationResultsPath).Subrouter()
 
@@ -144,19 +148,24 @@ func Register(ctx context.Context, router *mux.Router, ctrlOpts ctrl.Options) er
 			HandlerFactory: awsproxy_ctrl.NewGetAWSOperationStatuses,
 		},
 		{
-			ParentRouter:   awsResourcesSubRouter,
+			ParentRouter:   awsResourceCollectionSubRouter,
+			Method:         v1.OperationGet,
+			HandlerFactory: awsproxy_ctrl.NewListAWSResources,
+		},
+		{
+			ParentRouter:   awsSingleResourceSubRouter,
 			Method:         v1.OperationPut,
 			HandlerFactory: awsproxy_ctrl.NewCreateOrUpdateAWSResource,
 		},
 		{
-			ParentRouter:   awsResourcesSubRouter,
+			ParentRouter:   awsSingleResourceSubRouter,
 			Method:         v1.OperationDelete,
 			HandlerFactory: awsproxy_ctrl.NewDeleteAWSResource,
 		},
 		{
-			ParentRouter:   awsResourcesSubRouter,
+			ParentRouter:   awsSingleResourceSubRouter,
 			Method:         v1.OperationGet,
-			HandlerFactory: awsproxy_ctrl.NewGetOrListAWSResource,
+			HandlerFactory: awsproxy_ctrl.NewGetAWSResource,
 		},
 
 		// Proxy request should take the least priority in routing and should therefore be last
