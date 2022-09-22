@@ -82,7 +82,6 @@ func Register(ctx context.Context, router *mux.Router, ctrlOpts ctrl.Options) er
 	resourceGroupSubRouter := router.Path(fmt.Sprintf("%s%s", baseURL, resourceGroupItemPath)).Subrouter()
 
 	awsResourcesSubRouter := router.PathPrefix(fmt.Sprintf("%s%s", baseURL, awsPlaneType)).Subrouter()
-	awsResourceCollectionSubRouter := awsResourcesSubRouter.Path(awsResourceCollectionPath).Subrouter()
 	awsSingleResourceSubRouter := awsResourcesSubRouter.Path(awsResourcePath).Subrouter()
 	awsOperationStatusesSubRouter := awsResourcesSubRouter.PathPrefix(awsOperationStatusesPath).Subrouter()
 	awsOperationResultsSubRouter := awsResourcesSubRouter.PathPrefix(awsOperationResultsPath).Subrouter()
@@ -148,11 +147,6 @@ func Register(ctx context.Context, router *mux.Router, ctrlOpts ctrl.Options) er
 			HandlerFactory: awsproxy_ctrl.NewGetAWSOperationStatuses,
 		},
 		{
-			ParentRouter:   awsResourceCollectionSubRouter,
-			Method:         v1.OperationGet,
-			HandlerFactory: awsproxy_ctrl.NewListAWSResources,
-		},
-		{
 			ParentRouter:   awsSingleResourceSubRouter,
 			Method:         v1.OperationPut,
 			HandlerFactory: awsproxy_ctrl.NewCreateOrUpdateAWSResource,
@@ -161,11 +155,6 @@ func Register(ctx context.Context, router *mux.Router, ctrlOpts ctrl.Options) er
 			ParentRouter:   awsSingleResourceSubRouter,
 			Method:         v1.OperationDelete,
 			HandlerFactory: awsproxy_ctrl.NewDeleteAWSResource,
-		},
-		{
-			ParentRouter:   awsSingleResourceSubRouter,
-			Method:         v1.OperationGet,
-			HandlerFactory: awsproxy_ctrl.NewGetAWSResource,
 		},
 
 		// Proxy request should take the least priority in routing and should therefore be last
