@@ -11,6 +11,9 @@ import (
 
 	"github.com/gorilla/mux"
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
+	armrpc_ctrl "github.com/project-radius/radius/pkg/armrpc/frontend/controller"
+	"github.com/project-radius/radius/pkg/armrpc/frontend/defaultoperation"
+	"github.com/project-radius/radius/pkg/corerp/datamodel/converter"
 	ctrl "github.com/project-radius/radius/pkg/ucp/frontend/controller"
 	awsproxy_ctrl "github.com/project-radius/radius/pkg/ucp/frontend/controller/awsproxy"
 	kubernetes_ctrl "github.com/project-radius/radius/pkg/ucp/frontend/controller/kubernetes"
@@ -136,9 +139,13 @@ func Register(ctx context.Context, router *mux.Router, ctrlOpts ctrl.Options) er
 			HandlerFactory: resourcegroups_ctrl.NewDeleteResourceGroup,
 		},
 		{
-			ParentRouter:   resourceGroupSubRouter.Path("/resources").Subrouter(),
-			Method:         v1.OperationGet,
-			HandlerFactory: resourcegroups_ctrl.NewGetResourceGroup,
+			ParentRouter: resourceGroupSubRouter.Path("/resources").Subrouter(),
+			Method:       v1.OperationGet,
+			HandlerFactory: func(opt ctrl.Options) (ctrl.Controller, error) {
+				opt1 := armrpc_ctrl.Options{}
+
+				return defaultoperation.NewListResources(opt1, converter.TrackedResourceDataModelToVersioned)
+			},
 		},
 
 		// AWS Plane handlers
