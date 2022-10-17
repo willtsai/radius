@@ -1,0 +1,94 @@
+.Root-container {
+    display: flex;
+    height: 100%;
+    width: 100%;
+  }
+
+.Root-sidebar {
+    width: 22rem;
+    background-color: #f5f6fa;
+    border-right: solid 1px #b1acac;
+    display: flex;
+    flex-direction: column;
+    flex-basis: content;
+}
+
+.Root-sidebar h1 {
+    font-size: 1rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding: 1rem 2rem;
+    border-top: 1px solid #e3e3e3;
+    order: 1;
+    line-height: 1;
+}
+
+.Root-sidebar nav {
+    flex: 1;
+    overflow: auto;
+    padding: 0.5rem 1rem;
+}
+
+.Root-sidebar nav a span {
+    float: right;
+    color: #eeb004;
+}
+
+.Root-sidebar nav a.active span {
+    color: inherit;
+}
+
+.Root-sidebar nav .active i {
+    color: inherit;
+}
+
+.Root-sidebar ul {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.Root-sidebar li {
+    margin: 0.25rem 0;
+}
+
+.Root-sidebar nav a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    overflow: hidden;
+
+    white-space: pre;
+    padding: 0.5rem;
+    border-radius: 8px;
+    color: inherit;
+    text-decoration: none;
+    gap: 1rem;
+}
+
+.Root-sidebar nav a:hover {
+    background: #e3e3e3;
+}
+
+.Root-sidebar nav a.active {
+    background: hsl(224, 98%, 58%);
+    color: white;
+}
+
+.Root-sidebar nav a.pending {
+    color: hsl(224, 98%, 58%);
+}
+
+.Root-detail {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.Root-detail.loading {
+    opacity: 0.25;
+    transition: opacity 200ms;
+    transition-delay: 200ms;
+}
