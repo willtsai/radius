@@ -46,13 +46,20 @@ func ParseAWSRequest(ctx context.Context, opts ctrl.Options, r *http.Request) (a
 	return client, resourceType, id, nil
 }
 
-func getPrimaryIdentifiers(resourceType string) []interface{} {
+func getPrimaryIdentifiers(opts ctrl.Options, resourceType string) []interface{} {
 	sess, err := session.NewSession()
 	if err != nil {
 		fmt.Println("Error creating session ", err)
 		return nil
 	}
-	svc := cloudformation.New(sess, aws.NewConfig().WithRegion("us-west-2"))
+
+	var svc awsclient.AWSCloudFormationClient
+	if opts.AWSCloudFormationClient == nil {
+		svc = cloudformation.New(sess, aws.NewConfig().WithRegion("us-west-2"))
+	} else {
+		svc = opts.AWSCloudFormationClient
+	}
+
 	output, err := svc.DescribeType(&cloudformation.DescribeTypeInput{
 		TypeName: aws.String(resourceType),
 		Type:     aws.String("RESOURCE"),
@@ -71,8 +78,8 @@ func getPrimaryIdentifiers(resourceType string) []interface{} {
 	return primaryIdentifier
 }
 
-func getResourceIDWithMultiIdentifiers(url string, resourceType string, properties map[string]interface{}) (string, error) {
-	primaryIdentifiers := getPrimaryIdentifiers(resourceType)
+func getResourceIDWithMultiIdentifiers(opts ctrl.Options, url string, resourceType string, properties map[string]interface{}) (string, error) {
+	primaryIdentifiers := getPrimaryIdentifiers(opts, resourceType)
 	var resourceID string
 	for _, pi := range primaryIdentifiers {
 		// Primary identifier is of the form /properties/<property-name>

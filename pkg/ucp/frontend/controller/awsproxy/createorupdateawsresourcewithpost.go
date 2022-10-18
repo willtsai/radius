@@ -55,7 +55,7 @@ func (p *CreateOrUpdateAWSResourceWithPost) Run(ctx context.Context, w http.Resp
 		}
 	}
 
-	resourceID, err := getResourceIDWithMultiIdentifiers(req.URL.Path, resourceType, properties)
+	resourceID, err := getResourceIDWithMultiIdentifiers(p.Options, req.URL.Path, resourceType, properties)
 	if err != nil {
 		e := v1.ErrorResponse{
 			Error: v1.ErrorDetails{
@@ -148,7 +148,6 @@ func (p *CreateOrUpdateAWSResourceWithPost) Run(ctx context.Context, w http.Resp
 			responseProperties["provisioningState"] = v1.ProvisioningStateSucceeded
 			responseBody := map[string]interface{}{
 				"id":         id.String(),
-				"name":       id.Name(),
 				"type":       id.Type(),
 				"properties": responseProperties,
 			}
@@ -175,7 +174,6 @@ func (p *CreateOrUpdateAWSResourceWithPost) Run(ctx context.Context, w http.Resp
 
 	responseBody := map[string]interface{}{
 		"id":         id.String(),
-		"name":       id.Name(),
 		"type":       id.Type(),
 		"properties": responseProperties,
 	}

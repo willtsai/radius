@@ -52,7 +52,7 @@ func (p *DeleteAWSResourceWithPost) Run(ctx context.Context, w http.ResponseWrit
 		}
 	}
 
-	resourceID, err := getResourceIDWithMultiIdentifiers(req.URL.Path, resourceType, properties)
+	resourceID, err := getResourceIDWithMultiIdentifiers(p.Options, req.URL.Path, resourceType, properties)
 	if err != nil {
 		e := v1.ErrorResponse{
 			Error: v1.ErrorDetails{
