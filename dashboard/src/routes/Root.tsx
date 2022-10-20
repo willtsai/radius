@@ -19,7 +19,6 @@ export default function Root() {
       </Navbar>
       <div className="Root-container">
         <div className="Root-sidebar">
-          <h1>Radius Dashboard</h1>
           <nav>
             <ul>
               <li>
