@@ -6,11 +6,11 @@
 
 .Root-sidebar {
     width: 22rem;
-    background-color: #f5f6fa;
-    border-right: solid 1px #b1acac;
+    background-color: #e7e7e7;
     display: flex;
     flex-direction: column;
     flex-basis: content;
+    box-shadow: 0 0 10px rgb(0 0 0 / 0.2);
 }
 
 .Root-sidebar h1 {
@@ -55,6 +55,8 @@
 }
 
 .Root-sidebar nav a {
+    font-weight: 500;
+
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -69,11 +71,11 @@
 }
 
 .Root-sidebar nav a:hover {
-    background: #e3e3e3;
+    background: #c8d2e8;
 }
 
 .Root-sidebar nav a.active {
-    background: hsl(224, 98%, 58%);
+    background: #4693f7;
     color: white;
 }
 
