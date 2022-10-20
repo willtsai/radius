@@ -3,7 +3,7 @@ import Container from 'react-bootstrap/Container';
 import Navbar from "react-bootstrap/Navbar";
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faHouse, faCube, faPager, faCubes, faBorderAll } from '@fortawesome/free-solid-svg-icons';
+import { faCube, faPager, faCubes, faBorderAll } from '@fortawesome/free-solid-svg-icons';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './Root.css';
@@ -22,16 +22,16 @@ export default function Root() {
           <nav>
             <ul>
               <li>
-                <NavLink to={`environments`}><FontAwesomeIcon icon={faCube} />  Environments</NavLink>
+                <NavLink to={`environments`}><FontAwesomeIcon icon={faCube} fixedWidth />  Environments</NavLink>
               </li>
               <li>
-                <NavLink to={`applications`}><FontAwesomeIcon icon={faPager} />  Applications</NavLink>
+                <NavLink to={`applications`}><FontAwesomeIcon icon={faPager} fixedWidth />  Applications</NavLink>
               </li>
               <li>
-                <NavLink to={`containers`}><FontAwesomeIcon icon={faCubes} />  Containers</NavLink>
+                <NavLink to={`containers`}><FontAwesomeIcon icon={faCubes} fixedWidth />  Containers</NavLink>
               </li>
               <li>
-                <NavLink to={`resources`}><FontAwesomeIcon icon={faBorderAll} />  Resources</NavLink>
+                <NavLink to={`resources`}><FontAwesomeIcon icon={faBorderAll} fixedWidth />  Resources</NavLink>
               </li>
             </ul>
           </nav>
