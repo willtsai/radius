@@ -52,3 +52,4 @@ pkg/handlers/gomock_*
 
 # node modules
 cadl/node_modules
+dashboard/node_modules/
