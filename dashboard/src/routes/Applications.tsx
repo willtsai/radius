@@ -1,9 +1,7 @@
 import { TableColumn } from "react-data-table-component";
-import ResourceView, { extractResourceGroup, extractResourceName, Resource } from "../components/ResourceView";
-
-interface ApplicationProperties {
-    environment: string
-}
+import ResourceView from "../components/ResourceView";
+import { ApplicationProperties } from "../resources/applications";
+import { extractResourceGroup, extractResourceName, Resource } from "../resources/resources";
 
 const columns : TableColumn<Resource<ApplicationProperties>>[] = [
   {
@@ -20,7 +18,13 @@ const columns : TableColumn<Resource<ApplicationProperties>>[] = [
     name: 'Environment',
     selector: (row: Resource<ApplicationProperties>) => extractResourceName(row.properties.environment) ?? '',
     sortable: true,
-},
+  },
+  {
+    name:'Actions',
+    cell: (row: Resource<ApplicationProperties>) => <><a className="btn btn-primary" href={`/topology?application=${encodeURIComponent(row.id)}`} role="button">Map</a></>,
+    button: true,
+    center: true,
+  },
 ];
 
 

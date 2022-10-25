@@ -1,8 +1,7 @@
 import { TableColumn } from "react-data-table-component";
-import ResourceView, { extractResourceGroup, Resource } from "../components/ResourceView";
-
-interface EnvironmentProperties {
-}
+import ResourceView from "../components/ResourceView";
+import { EnvironmentProperties } from "../resources/environments";
+import { extractResourceGroup, Resource } from "../resources/resources";
 
 const columns : TableColumn<Resource<EnvironmentProperties>>[] = [
   {

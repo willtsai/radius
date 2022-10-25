@@ -1,41 +1,9 @@
 import React from "react";
 import DataTable, { TableColumn } from 'react-data-table-component';
 import { useErrorHandler } from "react-error-boundary";
+import { Resource } from "../resources/resources";
 import RefreshButton from "./RefreshButton";
 import "./ResourceView.css"
-
-export interface Resource<TProperties> {
-  id: string
-  name: string
-  type: string
-  properties: TProperties
-}
-
-export const extractResourceGroup = (id: string): string | null => {
-  const parts = id.split('/').filter(v => v.length > 0)
-  for (let i = 0; i < parts.length; i++) {
-    if (parts[i] === 'providers') {
-      return parts[i - 1]
-    }
-  }
-
-  return null
-}
-
-export const extractResourceName = (id: string | undefined): string | null => {
-  if (!id) {
-    return null;
-  }
-
-  const parts = id.split('/').filter(v => v.length > 0)
-  for (let i = 0; i < parts.length; i++) {
-    if (parts[i] === 'providers') {
-      return parts[i + 3]
-    }
-  }
-
-  return null
-}
 
 export default function ResourceView<TProperties>(props: { resourceType: string | undefined, heading: string, selectionMessage: string, columns: TableColumn<Resource<TProperties>>[] }) {
   let [state, setState] = React.useState({ loading: true, resources: [] })

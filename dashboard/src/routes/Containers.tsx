@@ -1,5 +1,6 @@
 import { TableColumn } from "react-data-table-component";
-import ResourceView, { extractResourceGroup, extractResourceName, Resource } from "../components/ResourceView";
+import ResourceView from "../components/ResourceView";
+import { extractResourceGroup, extractResourceName, Resource } from "../resources/resources";
 
 interface ContainerProperties {
   application: string

@@ -1,0 +1,30 @@
+.TopologyPage-header {
+    width: 100%;
+    border-bottom: solid 1px #b1acac;
+    padding: 1em;
+    display: flex;
+    align-items: center;
+}
+
+.TopologyPage-header h1 {
+    display: inline-block;
+    flex-grow: 1;
+}
+
+.TopologyPage-header button {
+    float: right;
+    vertical-align: middle;
+}
+
+.TopologyPage-main {
+    width: 100%;
+    flex-grow: 1;
+    padding: 1em;
+}
+
+.TopologyPage-not-loaded {
+    align-content: center;
+    text-align: center;
+    font-style: italic;
+    color: #808080;
+}

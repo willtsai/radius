@@ -17,6 +17,7 @@ import ApplicationPage from './routes/Applications';
 import EnvironmentPage from './routes/Environments';
 import ContainerPage from './routes/Containers';
 import ResourcePage from './routes/Resources';
+import TopologyPage from './routes/Topology';
 
 const container = document.getElementById('root')!;
 const root = createRoot(container);
@@ -46,7 +47,11 @@ const router = createBrowserRouter([
       {
         path: "resources",
         element: <ResourcePage />
-      }
+      },
+      {
+        path: "topology",
+        element: <TopologyPage />
+      },
     ]
   },
 ]);

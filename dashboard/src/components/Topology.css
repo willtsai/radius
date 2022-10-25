@@ -1,0 +1,16 @@
+/* The react-d3-graph library will choose wierd sizes by default. Force 100% fill of the content area */
+#topology-graph-wrapper {
+    width: 100%;
+    height: 100%;
+}
+
+#topology-graph-wrapper svg {
+    width: 100%;
+    height: 100%;
+}
+
+.TopologyView-container {
+    width: 100%;
+    height: 100%;
+    border: 1px black solid;
+}
