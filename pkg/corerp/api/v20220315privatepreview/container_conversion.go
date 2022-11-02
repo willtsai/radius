@@ -464,6 +464,7 @@ func fromPermissionDataModel(rbac datamodel.VolumePermission) *VolumePermission 
 	return &r
 }
 
+// toExtensionDataModel: Converts from versioned datamodel to base datamodel
 func toExtensionDataModel(e ExtensionClassification) datamodel.Extension {
 	switch c := e.(type) {
 	case *ManualScalingExtension:
@@ -486,6 +487,13 @@ func toExtensionDataModel(e ExtensionClassification) datamodel.Extension {
 			},
 		}
 		return *converted
+	case *ContainerKubernetesMetadataExtension:
+		converted := &datamodel.Extension{
+			Kind: datamodel.ContainerKubernetesMetadata,
+		}
+		converted.ContainerKubernetesMetadata.Annotations = to.StringMap(c.Annotations)
+		converted.ContainerKubernetesMetadata.Labels = to.StringMap(c.Labels)
+		return *converted
 	}
 
 	return datamodel.Extension{}
@@ -507,6 +515,12 @@ func fromExtensionClassificationDataModel(e datamodel.Extension) ContainerExtens
 			Config:   to.StringPtr(e.DaprSidecar.Config),
 			Protocol: fromProtocolDataModel(e.DaprSidecar.Protocol),
 			Provides: to.StringPtr(e.DaprSidecar.Provides),
+		}
+		return converted.GetContainerExtension()
+	case datamodel.ContainerKubernetesMetadata:
+		converted := ContainerKubernetesMetadataExtension{
+			Annotations: *to.StringMapPtr(e.ContainerKubernetesMetadata.Annotations),
+			Labels:      *to.StringMapPtr(e.ContainerKubernetesMetadata.Labels),
 		}
 		return converted.GetContainerExtension()
 	}
