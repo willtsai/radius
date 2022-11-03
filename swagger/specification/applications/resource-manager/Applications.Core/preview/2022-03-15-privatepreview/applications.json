@@ -313,39 +313,14 @@
           }
         }
       },
-      "ApplicationExtension": {
-        "allOf": [
-          {
-            "$ref": "global.json#/definitions/Extension"
-          }
-        ]
-      },
       "ApplicationKubernetesMetadataExtension": {
         "type": "object",
         "allOf": [
           {
-            "$ref": "#/definitions/ApplicationExtension"  
+            "$ref": "container.json#/definitions/KubernetesMetadataExtension"
           }
         ],
-        "description": "Specifies the metadata that should be applied to Kubernetes resources created by all Containers in this Application.",
-        "properties": {
-          "annotations": {
-            "description": "Annotations to be applied to the Kubernetes resources output by the resource",
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
-          "labels": {
-            "description": "Labels to be applied to the Kubernetes resources output by the resource",
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          }
-        },
-        "additionalProperties": false,
-        "x-ms-discriminator-value": "kubernetesMetadata"
+        "description": "Specifies the metadata that should be applied to Kubernetes resources created by all Containers in this Application."
       },
       "ApplicationProperties": {
         "description": "Application properties",
