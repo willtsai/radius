@@ -490,9 +490,11 @@ func toExtensionDataModel(e ExtensionClassification) datamodel.Extension {
 	case *ContainerKubernetesMetadataExtension:
 		converted := &datamodel.Extension{
 			Kind: datamodel.KubernetesMetadata,
+			KubernetesMetadata: &datamodel.BaseKubernetesMetadataExtension{
+				Annotations: to.StringMap(c.Annotations),
+				Labels:      to.StringMap(c.Labels),
+			},
 		}
-		converted.KubernetesMetadata.Annotations = to.StringMap(c.Annotations)
-		converted.KubernetesMetadata.Labels = to.StringMap(c.Labels)
 		return *converted
 	}
 
@@ -519,6 +521,7 @@ func fromExtensionClassificationDataModel(e datamodel.Extension) ContainerExtens
 		return converted.GetContainerExtension()
 	case datamodel.KubernetesMetadata:
 		converted := ContainerKubernetesMetadataExtension{
+			Kind:        to.StringPtr(string(e.Kind)),
 			Annotations: *to.StringMapPtr(e.KubernetesMetadata.Annotations),
 			Labels:      *to.StringMapPtr(e.KubernetesMetadata.Labels),
 		}
