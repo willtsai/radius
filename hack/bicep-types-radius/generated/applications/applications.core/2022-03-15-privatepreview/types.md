@@ -120,10 +120,7 @@
 * **container**: [Container](#container) (Required): Definition of a container.
 * **environment**: string: The resource id of the environment linked to the resource
 * **extensions**: [ContainerExtension](#containerextension)[]: Extensions spec of the resource
-<<<<<<< HEAD
 * **identity**: [IdentitySettings](#identitysettings)
-=======
->>>>>>> a5b5470c (temp checkin.datamodel still not unmarshalling)
 * **provisioningState**: 'Accepted' | 'Canceled' | 'Deleting' | 'Failed' | 'Provisioning' | 'Succeeded' | 'Updating' (ReadOnly): Provisioning state of the resource at the time the operation was called.
 * **status**: [ResourceStatus](#resourcestatus) (ReadOnly): Status of a resource.
 
@@ -294,27 +291,6 @@
 * **kind**: 'kubernetes' (Required): Type of compute resource.
 * **namespace**: string (Required): The namespace to use for the environment.
 
-
-## EnvironmentExtension
-* **Discriminator**: kind
-
-### Base Properties
-### EnvironmentKubernetesMetadataExtension
-#### Properties
-* **annotations**: [EnvironmentKubernetesMetadataExtensionAnnotations](#environmentkubernetesmetadataextensionannotations): Annotations to be applied to the Kubernetes resources output by the resource
-* **kind**: 'kubernetesMetadata' (Required): Specifies the extensions of a resource.
-* **labels**: [EnvironmentKubernetesMetadataExtensionLabels](#environmentkubernetesmetadataextensionlabels): Labels to be applied to the Kubernetes resources output by the resource
-
-
-## EnvironmentKubernetesMetadataExtensionAnnotations
-### Properties
-### Additional Properties
-* **Additional Properties Type**: string
-
-## EnvironmentKubernetesMetadataExtensionLabels
-### Properties
-### Additional Properties
-* **Additional Properties Type**: string
 
 ## EnvironmentExtension
 * **Discriminator**: kind

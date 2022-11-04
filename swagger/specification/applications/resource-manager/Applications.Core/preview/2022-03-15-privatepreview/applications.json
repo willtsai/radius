@@ -235,22 +235,9 @@
         "produces": [
           "application/json"
         ],
-        "properties": {
-          "provisioningState": {
-            "readOnly": true,
-            "$ref": "global.json#/definitions/ProvisioningState",
-            "description": "Provisioning state of the application at the time the operation was called."
-          },
-          "environment": {
-            "description": "The resource id of the environment linked to application.",
-            "type": "string"
-          },
-          "extensions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/definitions/ApplicationExtension"
-            },
-            "description": "Extensions spec of the resource"
+        "x-ms-examples": {
+          "RadiusApplicationsDelete": {
+            "$ref": "./examples/ApplicationsDelete.json"
           }
         },
         "tags": [
