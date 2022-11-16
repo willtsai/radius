@@ -8,39 +8,49 @@ package framework
 import (
 	"context"
 
-	"github.com/project-radius/radius/pkg/cli/clients"
+	"github.com/project-radius/radius/pkg/cli/bicep"
 	"github.com/project-radius/radius/pkg/cli/cmd/env/namespace"
 	"github.com/project-radius/radius/pkg/cli/connections"
+	"github.com/project-radius/radius/pkg/cli/deploy"
 	"github.com/project-radius/radius/pkg/cli/helm"
 	"github.com/project-radius/radius/pkg/cli/kubernetes"
 	"github.com/project-radius/radius/pkg/cli/output"
 	"github.com/project-radius/radius/pkg/cli/prompt"
+	"github.com/project-radius/radius/pkg/cli/setup"
 	"github.com/spf13/cobra"
 )
 
 // Factory interface handles resources for interfacing with corerp and configs
 type Factory interface {
+	GetBicep() bicep.Interface
 	GetConnectionFactory() connections.Factory
 	GetConfigHolder() *ConfigHolder
+	GetDeploy() deploy.Interface
 	GetOutput() output.Interface
 	GetPrompter() prompt.Interface
 	GetConfigFileInterface() ConfigFileInterface
 	GetKubernetesInterface() kubernetes.Interface
 	GetHelmInterface() helm.Interface
 	GetNamespaceInterface() namespace.Interface
-	GetAppManagementClient() clients.ApplicationsManagementClient
+	GetSetupInterface() setup.Interface
 }
 
 type Impl struct {
+	Bicep bicep.Interface
 	ConnectionFactory   connections.Factory
 	ConfigHolder        *ConfigHolder
+	Deploy deploy.Interface
 	Output              output.Interface
 	Prompter            prompt.Interface
 	ConfigFileInterface ConfigFileInterface
 	KubernetesInterface kubernetes.Interface
 	HelmInterface       helm.Interface
 	NamespaceInterface  namespace.Interface
-	AppManagementClient clients.ApplicationsManagementClient
+	SetupInterface      setup.Interface
+}
+
+func (i *Impl) GetBicep() bicep.Interface {
+	return i.Bicep
 }
 
 func (i *Impl) GetConnectionFactory() connections.Factory {
@@ -49,6 +59,10 @@ func (i *Impl) GetConnectionFactory() connections.Factory {
 
 func (i *Impl) GetConfigHolder() *ConfigHolder {
 	return i.ConfigHolder
+}
+
+func (i *Impl) GetDeploy() deploy.Interface {
+	return i.Deploy
 }
 
 func (i *Impl) GetOutput() output.Interface {
@@ -80,8 +94,8 @@ func (i *Impl) GetNamespaceInterface() namespace.Interface {
 	return i.NamespaceInterface
 }
 
-func (i *Impl) GetAppManagementClient() clients.ApplicationsManagementClient {
-	return i.AppManagementClient
+func (i *Impl) GetSetupInterface() setup.Interface {
+	return i.SetupInterface
 }
 
 type Runner interface {

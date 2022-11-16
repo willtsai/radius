@@ -12,6 +12,7 @@ import (
 	corerp "github.com/project-radius/radius/pkg/corerp/api/v20220315privatepreview"
 	"github.com/spf13/cobra"
 
+	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
 	"github.com/project-radius/radius/pkg/cli"
 	"github.com/project-radius/radius/pkg/cli/clients"
 	"github.com/project-radius/radius/pkg/cli/cmd"
@@ -25,6 +26,7 @@ import (
 	"github.com/project-radius/radius/pkg/ucp/resources"
 )
 
+// NewCommand creates an instance of the command and runner for the `rad env create` command.
 func NewCommand(factory framework.Factory) (*cobra.Command, framework.Runner) {
 	runner := NewRunner(factory)
 
@@ -48,6 +50,7 @@ Applications deployed to an environment will inherit the container runtime, conf
 	return cmd, runner
 }
 
+// Runner is the runner implementation for the `rad env create` command.
 type Runner struct {
 	ConfigHolder        *framework.ConfigHolder
 	Output              output.Interface
@@ -59,10 +62,10 @@ type Runner struct {
 	ConfigFileInterface framework.ConfigFileInterface
 	KubernetesInterface kubernetes.Interface
 	NamespaceInterface  namespace.Interface
-	AppManagementClient clients.ApplicationsManagementClient
 	SkipDevRecipes      bool
 }
 
+// NewRunner creates a new instance of the `rad env create` runner.
 func NewRunner(factory framework.Factory) *Runner {
 	return &Runner{
 		ConfigHolder:        factory.GetConfigHolder(),
@@ -71,10 +74,10 @@ func NewRunner(factory framework.Factory) *Runner {
 		ConfigFileInterface: factory.GetConfigFileInterface(),
 		KubernetesInterface: factory.GetKubernetesInterface(),
 		NamespaceInterface:  factory.GetNamespaceInterface(),
-		AppManagementClient: factory.GetAppManagementClient(),
 	}
 }
 
+// Validate runs validation for the `rad env create` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 	config := r.ConfigHolder.Config
 
@@ -83,6 +86,11 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	r.Workspace = workspace
+
+	// TODO: support fallback workspace
+	if !r.Workspace.IsNamedWorkspace() {
+		return workspaces.ErrNamedWorkspaceRequired
+	}
 
 	r.EnvironmentName, err = cli.RequireEnvironmentNameArgs(cmd, args, *workspace)
 	if err != nil {
@@ -124,13 +132,13 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		r.Workspace.Scope = "/planes/radius/local/resourcegroups/" + r.UCPResourceGroup
 	}
 
-	r.AppManagementClient, err = r.ConnectionFactory.CreateApplicationsManagementClient(cmd.Context(), *r.Workspace)
+	client, err := r.ConnectionFactory.CreateApplicationsManagementClient(cmd.Context(), *r.Workspace)
 	if err != nil {
 		return err
 	}
 
-	_, err = r.AppManagementClient.ShowUCPGroup(cmd.Context(), "radius", "local", r.UCPResourceGroup)
-	if cli.Is404ErrorForAzureError(err) {
+	_, err = client.ShowUCPGroup(cmd.Context(), "radius", "local", r.UCPResourceGroup)
+	if clients.Is404Error(err) {
 		return &cli.FriendlyError{Message: fmt.Sprintf("Resource group %q could not be found.", r.UCPResourceGroup)}
 	} else if err != nil {
 		return err
@@ -144,6 +152,7 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// Run runs the `rad env create` command.
 func (r *Runner) Run(ctx context.Context) error {
 	r.Output.LogInfo("Creating Environment...")
 	var providers corerp.Providers
@@ -151,7 +160,13 @@ func (r *Runner) Run(ctx context.Context) error {
 		(r.Workspace.ProviderConfig.Azure.SubscriptionID != "" && r.Workspace.ProviderConfig.Azure.ResourceGroup != "") {
 		providers = cmd.CreateEnvAzureProvider(r.Workspace.ProviderConfig.Azure.SubscriptionID, r.Workspace.ProviderConfig.Azure.ResourceGroup)
 	}
-	isEnvCreated, err := r.AppManagementClient.CreateEnvironment(ctx, r.EnvironmentName, "global", r.Namespace, "Kubernetes", "", map[string]*corerp.EnvironmentRecipeProperties{}, &providers, !r.SkipDevRecipes)
+
+	client, err := r.ConnectionFactory.CreateApplicationsManagementClient(ctx, *r.Workspace)
+	if err != nil {
+		return err
+	}
+
+	isEnvCreated, err := client.CreateEnvironment(ctx, r.EnvironmentName, v1.LocationGlobal, r.Namespace, "Kubernetes", "", map[string]*corerp.EnvironmentRecipeProperties{}, &providers, !r.SkipDevRecipes)
 	if err != nil || !isEnvCreated {
 		return err
 	}

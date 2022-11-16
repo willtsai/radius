@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
 	"github.com/project-radius/radius/pkg/cli"
 	"github.com/project-radius/radius/pkg/cli/clients"
 	"github.com/project-radius/radius/pkg/cli/cmd/env/namespace"
@@ -29,19 +30,7 @@ func Test_CommandValidation(t *testing.T) {
 
 func Test_Validate(t *testing.T) {
 	configWithWorkspace := radcli.LoadConfigWithWorkspace(t)
-	configWithoutWorkspace := radcli.LoadConfigWithoutWorkspace(t)
-
-	ctrl := gomock.NewController(t)
-	appManagementClient := clients.NewMockApplicationsManagementClient(ctrl)
-	namespaceClient := namespace.NewMockInterface(ctrl)
 	testResourceGroup := v20220901privatepreview.ResourceGroupResource{}
-
-	// Valid create command
-	createMocksWithValidCommand(namespaceClient, appManagementClient, testResourceGroup)
-	// Invalid resource group
-	createShowUCPError(appManagementClient, testResourceGroup)
-	// Invalid create command with invalid namespace
-	createMocksWithInvalidResourceGroup(namespaceClient, appManagementClient, testResourceGroup)
 
 	testcases := []radcli.ValidateInput{
 		{
@@ -52,8 +41,10 @@ func Test_Validate(t *testing.T) {
 				ConfigFilePath: "",
 				Config:         configWithWorkspace,
 			},
-			ConnectionFactory:  &connections.MockFactory{ApplicationsManagementClient: appManagementClient},
-			NamespaceInterface: namespaceClient,
+			ConfigureMocks: func(mocks radcli.ValidateMocks) {
+				// Valid create command
+				createMocksWithValidCommand(mocks.Namespace, mocks.ApplicationManagementClient, testResourceGroup)
+			},
 		},
 		{
 			Name:          "Create command with invalid resource group",
@@ -63,8 +54,10 @@ func Test_Validate(t *testing.T) {
 				ConfigFilePath: "",
 				Config:         configWithWorkspace,
 			},
-			ConnectionFactory:  &connections.MockFactory{ApplicationsManagementClient: appManagementClient},
-			NamespaceInterface: namespaceClient,
+			ConfigureMocks: func(mocks radcli.ValidateMocks) {
+				// Invalid resource group
+				createShowUCPError(mocks.ApplicationManagementClient, testResourceGroup)
+			},
 		},
 		{
 			Name:          "Create command with invalid namespace",
@@ -74,19 +67,19 @@ func Test_Validate(t *testing.T) {
 				ConfigFilePath: "",
 				Config:         configWithWorkspace,
 			},
-			ConnectionFactory:  &connections.MockFactory{ApplicationsManagementClient: appManagementClient},
-			NamespaceInterface: namespaceClient,
+			ConfigureMocks: func(mocks radcli.ValidateMocks) {
+				// Invalid create command with invalid namespace
+				createMocksWithInvalidResourceGroup(mocks.Namespace, mocks.ApplicationManagementClient, testResourceGroup)
+			},
 		},
 		{
-			Name:          "Create command without workspace",
+			Name:          "Create command with fallback workspace",
 			Input:         []string{"testingenv"},
 			ExpectedValid: false,
 			ConfigHolder: framework.ConfigHolder{
 				ConfigFilePath: "",
-				Config:         configWithoutWorkspace,
+				Config:         radcli.LoadEmptyConfig(t),
 			},
-			ConnectionFactory:  &connections.MockFactory{ApplicationsManagementClient: appManagementClient},
-			NamespaceInterface: namespaceClient,
 		},
 		{
 			Name:          "Create command with invalid environment",
@@ -96,8 +89,6 @@ func Test_Validate(t *testing.T) {
 				ConfigFilePath: "",
 				Config:         configWithWorkspace,
 			},
-			ConnectionFactory:  &connections.MockFactory{ApplicationsManagementClient: appManagementClient},
-			NamespaceInterface: namespaceClient,
 		},
 		{
 			Name:          "Create command with invalid workspace",
@@ -107,8 +98,6 @@ func Test_Validate(t *testing.T) {
 				ConfigFilePath: "",
 				Config:         configWithWorkspace,
 			},
-			ConnectionFactory:  &connections.MockFactory{ApplicationsManagementClient: appManagementClient},
-			NamespaceInterface: namespaceClient,
 		},
 	}
 	radcli.SharedValidateValidation(t, NewCommand, testcases)
@@ -122,7 +111,7 @@ func Test_Run(t *testing.T) {
 
 			namespaceClient := namespace.NewMockInterface(ctrl)
 			appManagementClient.EXPECT().
-				CreateEnvironment(context.Background(), "default", "global", "default", "Kubernetes", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				CreateEnvironment(context.Background(), "default", v1.LocationGlobal, "default", "Kubernetes", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(true, nil).Times(1)
 
 			configFileInterface := framework.NewMockConfigFileInterface(ctrl)
@@ -151,7 +140,7 @@ func Test_Run(t *testing.T) {
 				Namespace:           "default",
 				NamespaceInterface:  namespaceClient,
 				ConfigFileInterface: configFileInterface,
-				AppManagementClient: appManagementClient,
+				SkipDevRecipes:      true,
 			}
 
 			err := runner.Run(context.Background())
@@ -168,7 +157,7 @@ func Test_RunWithoutAzureProvider(t *testing.T) {
 
 			namespaceClient := namespace.NewMockInterface(ctrl)
 			appManagementClient.EXPECT().
-				CreateEnvironment(context.Background(), "default", "global", "default", "Kubernetes", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				CreateEnvironment(context.Background(), "default", v1.LocationGlobal, "default", "Kubernetes", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(true, nil).Times(1)
 
 			configFileInterface := framework.NewMockConfigFileInterface(ctrl)
@@ -195,7 +184,6 @@ func Test_RunWithoutAzureProvider(t *testing.T) {
 				Namespace:           "default",
 				NamespaceInterface:  namespaceClient,
 				ConfigFileInterface: configFileInterface,
-				AppManagementClient: appManagementClient,
 			}
 
 			err := runner.Run(context.Background())
@@ -212,7 +200,7 @@ func Test_Run_WithoutProvider(t *testing.T) {
 
 			namespaceClient := namespace.NewMockInterface(ctrl)
 			appManagementClient.EXPECT().
-				CreateEnvironment(context.Background(), "default", "global", "default", "Kubernetes", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				CreateEnvironment(context.Background(), "default", v1.LocationGlobal, "default", "Kubernetes", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(true, nil).Times(1)
 
 			configFileInterface := framework.NewMockConfigFileInterface(ctrl)
@@ -235,7 +223,82 @@ func Test_Run_WithoutProvider(t *testing.T) {
 				Namespace:           "default",
 				NamespaceInterface:  namespaceClient,
 				ConfigFileInterface: configFileInterface,
-				AppManagementClient: appManagementClient,
+			}
+
+			err := runner.Run(context.Background())
+			require.NoError(t, err)
+		})
+	})
+}
+
+func Test_Run_SkipDevRecipes(t *testing.T) {
+	t.Run("Run env create tests", func(t *testing.T) {
+		t.Run("Success with set to true", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			appManagementClient := clients.NewMockApplicationsManagementClient(ctrl)
+
+			namespaceClient := namespace.NewMockInterface(ctrl)
+			appManagementClient.EXPECT().
+				CreateEnvironment(context.Background(), "default", v1.LocationGlobal, "default", "Kubernetes", gomock.Any(), gomock.Any(), gomock.Any(), false).
+				Return(true, nil).Times(1)
+
+			configFileInterface := framework.NewMockConfigFileInterface(ctrl)
+			outputSink := &output.MockOutput{}
+			workspace := &workspaces.Workspace{
+				Connection: map[string]interface{}{
+					"kind":    "kubernetes",
+					"context": "kind-kind",
+				},
+				Name: "defaultWorkspace",
+			}
+
+			runner := &Runner{
+				ConnectionFactory:   &connections.MockFactory{ApplicationsManagementClient: appManagementClient},
+				ConfigHolder:        &framework.ConfigHolder{ConfigFilePath: "filePath"},
+				Output:              outputSink,
+				Workspace:           workspace,
+				EnvironmentName:     "default",
+				UCPResourceGroup:    "default",
+				Namespace:           "default",
+				NamespaceInterface:  namespaceClient,
+				ConfigFileInterface: configFileInterface,
+				SkipDevRecipes:      true,
+			}
+
+			err := runner.Run(context.Background())
+			require.NoError(t, err)
+		})
+
+		t.Run("Success with set to false", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			appManagementClient := clients.NewMockApplicationsManagementClient(ctrl)
+
+			namespaceClient := namespace.NewMockInterface(ctrl)
+			appManagementClient.EXPECT().
+				CreateEnvironment(context.Background(), "default", v1.LocationGlobal, "default", "Kubernetes", gomock.Any(), gomock.Any(), gomock.Any(), true).
+				Return(true, nil).Times(1)
+
+			configFileInterface := framework.NewMockConfigFileInterface(ctrl)
+			outputSink := &output.MockOutput{}
+			workspace := &workspaces.Workspace{
+				Connection: map[string]interface{}{
+					"kind":    "kubernetes",
+					"context": "kind-kind",
+				},
+				Name: "defaultWorkspace",
+			}
+
+			runner := &Runner{
+				ConnectionFactory:   &connections.MockFactory{ApplicationsManagementClient: appManagementClient},
+				ConfigHolder:        &framework.ConfigHolder{ConfigFilePath: "filePath"},
+				Output:              outputSink,
+				Workspace:           workspace,
+				EnvironmentName:     "default",
+				UCPResourceGroup:    "default",
+				Namespace:           "default",
+				NamespaceInterface:  namespaceClient,
+				ConfigFileInterface: configFileInterface,
+				SkipDevRecipes:      false,
 			}
 
 			err := runner.Run(context.Background())

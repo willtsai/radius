@@ -7,19 +7,15 @@ package container
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
-	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	"github.com/project-radius/radius/pkg/armrpc/api/conv"
 	apiv1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
 	"github.com/project-radius/radius/pkg/corerp/datamodel"
 	"github.com/project-radius/radius/pkg/corerp/handlers"
 	"github.com/project-radius/radius/pkg/corerp/renderers"
+	azvolrenderer "github.com/project-radius/radius/pkg/corerp/renderers/volume/azure"
 	"github.com/project-radius/radius/pkg/kubernetes"
 	"github.com/project-radius/radius/pkg/radlogger"
 	"github.com/project-radius/radius/pkg/resourcekinds"
@@ -27,6 +23,10 @@ import (
 	"github.com/project-radius/radius/pkg/rp"
 	"github.com/project-radius/radius/pkg/rp/outputresource"
 	"github.com/project-radius/radius/pkg/ucp/resources"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/go-logr/logr"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -46,6 +46,21 @@ const (
 	tempVolName      = "TempVolume"
 	tempVolMountPath = "/tmpfs"
 	testResourceID   = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.KeyVault/vaults/azure-kv"
+)
+
+var (
+	testEnvironmentOptions = renderers.EnvironmentOptions{
+		Namespace: "default",
+		CloudProviders: &datamodel.Providers{
+			Azure: datamodel.ProvidersAzure{
+				Scope: "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testGroup",
+			},
+		},
+		Identity: &rp.IdentitySettings{
+			Kind:       rp.AzureIdentityWorkload,
+			OIDCIssuer: "https://radiusoidc/00000000-0000-0000-0000-000000000000",
+		},
+	}
 )
 
 func createContext(t *testing.T) context.Context {
@@ -687,11 +702,13 @@ func Test_Render_ConnectionWithRoleAssignment(t *testing.T) {
 			},
 		},
 	}
-	output, err := renderer.Render(createContext(t), resource, renderers.RenderOptions{Dependencies: dependencies})
+	output, err := renderer.Render(createContext(t), resource, renderers.RenderOptions{Dependencies: dependencies, Environment: testEnvironmentOptions})
 	require.NoError(t, err)
-	require.Empty(t, output.ComputedValues)
+	require.Len(t, output.ComputedValues, 2)
+	require.Equal(t, output.ComputedValues[handlers.IdentityProperties].Value.(*rp.IdentitySettings).Kind, rp.AzureIdentityWorkload)
+	require.Equal(t, output.ComputedValues[handlers.UserAssignedIdentityIDKey].PropertyReference, handlers.UserAssignedIdentityIDKey)
 	require.Empty(t, output.SecretValues)
-	require.Len(t, output.Resources, 6)
+	require.Len(t, output.Resources, 7)
 
 	resourceMap := outputResourcesToKindMap(output.Resources)
 
@@ -754,41 +771,40 @@ func Test_Render_ConnectionWithRoleAssignment(t *testing.T) {
 			LocalID:  outputresource.LocalIDUserAssignedManagedIdentity,
 			Deployed: false,
 			Resource: map[string]string{
-				handlers.UserAssignedIdentityNameKey: applicationName + "-" + resource.Name + "-msi",
+				"userassignedidentityname":           "test-app-test-container",
+				"userassignedidentitysubscriptionid": "00000000-0000-0000-0000-000000000000",
+				"userassignedidentityresourcegroup":  "testGroup",
 			},
 		},
 	}
 	require.ElementsMatch(t, expected, matches)
 
-	matches = resourceMap[resourcekinds.AzurePodIdentity]
+	matches = resourceMap[resourcekinds.AzureFederatedIdentity]
 	require.Equal(t, 1, len(matches))
 
 	expected = []outputresource.OutputResource{
 		{
-			LocalID:  outputresource.LocalIDAADPodIdentity,
+			ResourceType: resourcemodel.ResourceType{
+				Type:     resourcekinds.AzureFederatedIdentity,
+				Provider: resourcemodel.ProviderAzure,
+			},
+			LocalID:  outputresource.LocalIDFederatedIdentity,
 			Deployed: false,
 			Resource: map[string]string{
-				handlers.PodIdentityNameKey: fmt.Sprintf("podid-%s-%s", strings.ToLower(applicationName), strings.ToLower(resource.Name)),
-				handlers.PodNamespaceKey:    applicationName,
-			},
-			ResourceType: resourcemodel.ResourceType{
-				Type:     resourcekinds.AzurePodIdentity,
-				Provider: resourcemodel.ProviderAzureKubernetesService,
+				"federatedidentityname":    "test-app-test-container",
+				"federatedidentitysubject": "system:serviceaccount:default:test-app-test-container",
+				"federatedidentityissuer":  "https://radiusoidc/00000000-0000-0000-0000-000000000000",
 			},
 			Dependencies: []outputresource.Dependency{
 				{
 					LocalID: outputresource.LocalIDUserAssignedManagedIdentity,
 				},
-				{
-					LocalID: outputresource.GenerateLocalIDForRoleAssignment(makeResourceID(t, "SomeProvider/TargetResourceType", "TargetResource").String(), "TestRole1"),
-				},
-				{
-					LocalID: outputresource.GenerateLocalIDForRoleAssignment(makeResourceID(t, "SomeProvider/TargetResourceType", "TargetResource").String(), "TestRole2"),
-				},
 			},
-		},
-	}
+		}}
 	require.ElementsMatch(t, expected, matches)
+
+	matches = resourceMap[resourcekinds.ServiceAccount]
+	require.Equal(t, 1, len(matches))
 }
 
 func Test_Render_AzureConnection(t *testing.T) {
@@ -819,11 +835,16 @@ func Test_Render_AzureConnection(t *testing.T) {
 			datamodel.KindAzure: {},
 		},
 	}
-	output, err := renderer.Render(createContext(t), resource, renderers.RenderOptions{Dependencies: dependencies})
+
+	output, err := renderer.Render(createContext(t), resource, renderers.RenderOptions{Dependencies: dependencies, Environment: testEnvironmentOptions})
 	require.NoError(t, err)
-	require.Empty(t, output.ComputedValues)
+
+	require.Len(t, output.ComputedValues, 2)
+	require.Equal(t, output.ComputedValues[handlers.IdentityProperties].Value.(*rp.IdentitySettings).Kind, rp.AzureIdentityWorkload)
+	require.Equal(t, output.ComputedValues[handlers.UserAssignedIdentityIDKey].PropertyReference, handlers.UserAssignedIdentityIDKey)
+
 	require.Empty(t, output.SecretValues)
-	require.Len(t, output.Resources, 4)
+	require.Len(t, output.Resources, 5)
 
 	kindResourceMap := outputResourcesToKindMap(output.Resources)
 
@@ -854,11 +875,9 @@ func Test_Render_AzureConnection(t *testing.T) {
 	}
 	require.ElementsMatch(t, expected, roleOutputResource)
 
-	outputResource := kindResourceMap[resourcekinds.AzureUserAssignedManagedIdentity]
-	require.Len(t, outputResource, 1)
-
-	outputResource = kindResourceMap[resourcekinds.AzurePodIdentity]
-	require.Len(t, outputResource, 1)
+	require.Len(t, kindResourceMap[resourcekinds.AzureUserAssignedManagedIdentity], 1)
+	require.Len(t, kindResourceMap[resourcekinds.AzureFederatedIdentity], 1)
+	require.Len(t, kindResourceMap[resourcekinds.ServiceAccount], 1)
 }
 
 func Test_Render_AzureConnectionEmptyRoleAllowed(t *testing.T) {
@@ -1040,99 +1059,6 @@ func Test_Render_PersistentAzureFileShareVolumes(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test_PrepareFederatedIdentity(t *testing.T) {
-	appName := "testapp"
-	namespace := "testns"
-
-	properties := datamodel.ContainerProperties{
-		BasicResourceProperties: rp.BasicResourceProperties{
-			Application: applicationResourceID,
-		},
-		Container: datamodel.Container{
-			Image: "someimage:latest",
-			Volumes: map[string]datamodel.VolumeProperties{
-				tempVolName: {
-					Kind: datamodel.Persistent,
-					Persistent: &datamodel.PersistentVolume{
-						VolumeBase: datamodel.VolumeBase{
-							MountPath: tempVolMountPath,
-						},
-						Source: testResourceID,
-					},
-				},
-			},
-		},
-	}
-
-	container := makeResource(t, properties)
-
-	const identityID = "/subscriptions/testSub/resourcegroups/testGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/radius-mi-app"
-
-	fedIdTests := []struct {
-		desc           string
-		computedValues map[string]any
-
-		// expected values
-		err     error
-		saName  string
-		outRes  []string
-		outDeps []outputresource.Dependency
-	}{
-		{
-			desc:           "nil computeValues",
-			computedValues: nil,
-			err:            nil,
-			saName:         "default",
-			outRes:         []string{},
-			outDeps:        []outputresource.Dependency{},
-		},
-		{
-			desc: "clientID not found",
-			computedValues: map[string]any{
-				handlers.AzureIdentityTypeKey: string(rp.AzureIdentityWorkload),
-				handlers.AzureIdentityIDKey:   identityID,
-			},
-			err:     errors.New("clientID not found"),
-			saName:  "",
-			outRes:  []string{},
-			outDeps: []outputresource.Dependency{},
-		},
-		{
-			desc: "valid identity",
-			computedValues: map[string]any{
-				handlers.AzureIdentityTypeKey:       string(rp.AzureIdentityWorkload),
-				handlers.AzureIdentityIDKey:         identityID,
-				handlers.AzureIdentityClientIDKey:   "fakeID",
-				handlers.AzureIdentityTenantIDKey:   "fakeTenantID",
-				handlers.FederatedIdentityIssuerKey: "https://fakeIssuer",
-			},
-			err:    nil,
-			saName: "testapp-test-container",
-			outRes: []string{outputresource.LocalIDServiceAccount, outputresource.LocalIDFederatedIdentity},
-			outDeps: []outputresource.Dependency{
-				{LocalID: outputresource.LocalIDServiceAccount},
-				{LocalID: outputresource.LocalIDFederatedIdentity},
-			},
-		},
-	}
-
-	testRenderer := Renderer{}
-
-	for _, tc := range fedIdTests {
-		t.Run(tc.desc, func(t *testing.T) {
-			sa, resources, deps, err := testRenderer.prepareFederatedIdentity(appName, namespace, tc.computedValues, container)
-			if tc.err != nil {
-				require.ErrorContains(t, err, tc.err.Error())
-			}
-			require.Equal(t, tc.saName, sa)
-			for i, id := range tc.outRes {
-				require.Equal(t, id, resources[i].LocalID)
-			}
-			require.ElementsMatch(t, tc.outDeps, deps)
-		})
-	}
-}
-
 func Test_Render_PersistentAzureKeyVaultVolumes(t *testing.T) {
 	properties := datamodel.ContainerProperties{
 		BasicResourceProperties: rp.BasicResourceProperties{
@@ -1166,7 +1092,6 @@ func Test_Render_PersistentAzureKeyVaultVolumes(t *testing.T) {
 					},
 					Kind: datamodel.AzureKeyVaultVolume,
 					AzureKeyVault: &datamodel.AzureKeyVaultVolumeProperties{
-						Identity: rp.IdentitySettings{Kind: rp.AzureIdentitySystemAssigned},
 						Resource: "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testGroup/providers/Microsoft.KeyVault/vaults/vault0",
 						Secrets: map[string]datamodel.SecretObjectProperties{
 							"my-secret": {
@@ -1177,6 +1102,9 @@ func Test_Render_PersistentAzureKeyVaultVolumes(t *testing.T) {
 						},
 					},
 				},
+			},
+			ComputedValues: map[string]any{
+				azvolrenderer.SPCVolumeObjectSpecKey: "objectspecs",
 			},
 			OutputResources: map[string]resourcemodel.ResourceIdentity{
 				outputresource.LocalIDSecretProviderClass: {
@@ -1196,23 +1124,29 @@ func Test_Render_PersistentAzureKeyVaultVolumes(t *testing.T) {
 	}
 
 	renderer := Renderer{}
-	renderOutput, err := renderer.Render(createContext(t), resource, renderers.RenderOptions{Dependencies: dependencies})
+	renderOutput, err := renderer.Render(createContext(t), resource, renderers.RenderOptions{Dependencies: dependencies, Environment: testEnvironmentOptions})
+
 	require.NoError(t, err)
-	require.Lenf(t, renderOutput.Resources, 1, "expected 1 output resource, instead got %+v", len(renderOutput.Resources))
+	require.Lenf(t, renderOutput.Resources, 7, "expected 7 output resources, instead got %+v", len(renderOutput.Resources))
 
 	// Verify deployment
-	require.Equal(t, outputresource.LocalIDDeployment, renderOutput.Resources[0].LocalID, "expected output resource of kind deployment instead got :%v", renderOutput.Resources[0].LocalID)
+	deploymentSpec := renderOutput.Resources[5]
+	require.Equal(t, outputresource.LocalIDDeployment, deploymentSpec.LocalID, "expected output resource of kind deployment instead got :%v", renderOutput.Resources[0].LocalID)
+	require.Contains(t, deploymentSpec.Dependencies[0].LocalID, "RoleAssignment")
+	require.Equal(t, deploymentSpec.Dependencies[1].LocalID, "SecretProviderClass")
+	require.Equal(t, deploymentSpec.Dependencies[2].LocalID, "ServiceAccount")
+	require.Equal(t, deploymentSpec.Dependencies[3].LocalID, "Secret")
 
 	// Verify volume spec
-	volumes := renderOutput.Resources[0].Resource.(*appsv1.Deployment).Spec.Template.Spec.Volumes
+	volumes := deploymentSpec.Resource.(*appsv1.Deployment).Spec.Template.Spec.Volumes
 	require.Lenf(t, volumes, 1, "expected 1 volume, instead got %+v", len(volumes))
 	require.Equal(t, tempVolName, volumes[0].Name)
 	require.Equal(t, "secrets-store.csi.k8s.io", volumes[0].VolumeSource.CSI.Driver, "expected volumesource azurefile to be not nil")
-	require.Equal(t, "test-volume-sp", volumes[0].VolumeSource.CSI.VolumeAttributes["secretProviderClass"], "expected secret provider class to match the input test-volume-sp")
+	require.Equal(t, "test-app-test-container", volumes[0].VolumeSource.CSI.VolumeAttributes["secretProviderClass"], "expected secret provider class to match the input test-volume-sp")
 	require.Equal(t, true, *volumes[0].VolumeSource.CSI.ReadOnly, "expected readonly attribute to be true")
 
 	// Verify volume mount spec
-	volumeMounts := renderOutput.Resources[0].Resource.(*appsv1.Deployment).Spec.Template.Spec.Containers[0].VolumeMounts
+	volumeMounts := deploymentSpec.Resource.(*appsv1.Deployment).Spec.Template.Spec.Containers[0].VolumeMounts
 	require.Lenf(t, volumeMounts, 1, "expected 1 volume mount, instead got %+v", len(volumeMounts))
 	require.Equal(t, tempVolMountPath, volumeMounts[0].MountPath)
 	require.Equal(t, tempVolName, volumeMounts[0].Name)

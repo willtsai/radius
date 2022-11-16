@@ -14,6 +14,7 @@ import (
 	"github.com/project-radius/radius/pkg/cli"
 	"github.com/project-radius/radius/pkg/cli/clients"
 	"github.com/project-radius/radius/pkg/cli/connections"
+	"github.com/project-radius/radius/pkg/cli/workspaces"
 	"github.com/spf13/cobra"
 )
 
@@ -40,6 +41,11 @@ rad resource expose --application icecream-store containers orders --port 5000 -
 			return err
 		}
 
+		// TODO: support fallback workspace
+		if !workspace.IsNamedWorkspace() {
+			return workspaces.ErrNamedWorkspaceRequired
+		}
+
 		// This gets the application name from the args provided
 		application, err := cli.RequireApplication(cmd, *workspace)
 		if err != nil {
@@ -55,7 +61,7 @@ rad resource expose --application icecream-store containers orders --port 5000 -
 		//ignore applicationresource as we only check for existence of application
 		_, err = managementClient.ShowApplication(cmd.Context(), application)
 		if err != nil {
-			appNotFound := cli.Is404ErrorForAzureError(err)
+			appNotFound := clients.Is404Error(err)
 			//suggest an application only when an existing one is not found
 			if appNotFound {
 				//ignore errors as we are trying to suggest an application and don't care about the errors in the suggestion process

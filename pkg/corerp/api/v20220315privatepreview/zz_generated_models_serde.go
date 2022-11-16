@@ -135,7 +135,6 @@ func (a AzureKeyVaultVolumeProperties) MarshalJSON() ([]byte, error) {
 	populate(objectMap, "application", a.Application)
 	populate(objectMap, "certificates", a.Certificates)
 	populate(objectMap, "environment", a.Environment)
-	populate(objectMap, "identity", a.Identity)
 	populate(objectMap, "keys", a.Keys)
 	objectMap["kind"] = "azure.com.keyvault"
 	populate(objectMap, "provisioningState", a.ProvisioningState)
@@ -162,9 +161,6 @@ func (a *AzureKeyVaultVolumeProperties) UnmarshalJSON(data []byte) error {
 				delete(rawMsg, key)
 		case "environment":
 				err = unpopulate(val, "Environment", &a.Environment)
-				delete(rawMsg, key)
-		case "identity":
-				err = unpopulate(val, "Identity", &a.Identity)
 				delete(rawMsg, key)
 		case "keys":
 				err = unpopulate(val, "Keys", &a.Keys)
@@ -411,6 +407,7 @@ func (c ContainerProperties) MarshalJSON() ([]byte, error) {
 	populate(objectMap, "container", c.Container)
 	populate(objectMap, "environment", c.Environment)
 	populate(objectMap, "extensions", c.Extensions)
+	populate(objectMap, "identity", c.Identity)
 	populate(objectMap, "provisioningState", c.ProvisioningState)
 	populate(objectMap, "status", c.Status)
 	return json.Marshal(objectMap)
@@ -439,6 +436,9 @@ func (c *ContainerProperties) UnmarshalJSON(data []byte) error {
 				delete(rawMsg, key)
 		case "extensions":
 				c.Extensions, err = unmarshalExtensionClassificationArray(val)
+				delete(rawMsg, key)
+		case "identity":
+				err = unpopulate(val, "Identity", &c.Identity)
 				delete(rawMsg, key)
 		case "provisioningState":
 				err = unpopulate(val, "ProvisioningState", &c.ProvisioningState)
@@ -994,6 +994,7 @@ func (g GatewayProperties) MarshalJSON() ([]byte, error) {
 	populate(objectMap, "provisioningState", g.ProvisioningState)
 	populate(objectMap, "routes", g.Routes)
 	populate(objectMap, "status", g.Status)
+	populate(objectMap, "tls", g.TLS)
 	populate(objectMap, "url", g.URL)
 	return json.Marshal(objectMap)
 }
@@ -1028,6 +1029,9 @@ func (g *GatewayProperties) UnmarshalJSON(data []byte) error {
 		case "status":
 				err = unpopulate(val, "Status", &g.Status)
 				delete(rawMsg, key)
+		case "tls":
+				err = unpopulate(val, "TLS", &g.TLS)
+				delete(rawMsg, key)
 		case "url":
 				err = unpopulate(val, "URL", &g.URL)
 				delete(rawMsg, key)
@@ -1061,6 +1065,33 @@ func (g *GatewayPropertiesHostname) UnmarshalJSON(data []byte) error {
 				delete(rawMsg, key)
 		case "prefix":
 				err = unpopulate(val, "Prefix", &g.Prefix)
+				delete(rawMsg, key)
+		}
+		if err != nil {
+			return fmt.Errorf("unmarshalling type %T: %v", g, err)
+		}
+	}
+	return nil
+}
+
+// MarshalJSON implements the json.Marshaller interface for type GatewayPropertiesTLS.
+func (g GatewayPropertiesTLS) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	populate(objectMap, "sslPassThrough", g.SSLPassThrough)
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON implements the json.Unmarshaller interface for type GatewayPropertiesTLS.
+func (g *GatewayPropertiesTLS) UnmarshalJSON(data []byte) error {
+	var rawMsg map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawMsg); err != nil {
+		return fmt.Errorf("unmarshalling type %T: %v", g, err)
+	}
+	for key, val := range rawMsg {
+		var err error
+		switch key {
+		case "sslPassThrough":
+				err = unpopulate(val, "SSLPassThrough", &g.SSLPassThrough)
 				delete(rawMsg, key)
 		}
 		if err != nil {

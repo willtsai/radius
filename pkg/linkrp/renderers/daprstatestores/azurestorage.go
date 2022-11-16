@@ -6,6 +6,7 @@
 package daprstatestores
 
 import (
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/project-radius/radius/pkg/armrpc/api/conv"
 	"github.com/project-radius/radius/pkg/linkrp/datamodel"
 	"github.com/project-radius/radius/pkg/linkrp/handlers"
@@ -19,7 +20,7 @@ import (
 func GetDaprStateStoreAzureStorage(resource datamodel.DaprStateStore, applicationName string, namespace string) (outputResources []outputresource.OutputResource, err error) {
 	var azuretableStorageID resources.ID
 	if resource.Properties.Kind == datamodel.DaprStateStoreKindAzureTableStorage {
-		properties := resource.Properties.DaprStateStoreAzureTableStorage
+		properties := resource.Properties
 		if properties.Resource == "" {
 			return nil, conv.NewClientErrInvalidRequest(renderers.ErrResourceMissingForResource.Error())
 		}
@@ -31,7 +32,7 @@ func GetDaprStateStoreAzureStorage(resource datamodel.DaprStateStore, applicatio
 
 	}
 	if resource.Properties.Kind == datamodel.DaprStateStoreKindStateSqlServer {
-		properties := resource.Properties.DaprStateStoreSQLServer
+		properties := resource.Properties
 		if properties.Resource == "" {
 			return nil, conv.NewClientErrInvalidRequest(renderers.ErrResourceMissingForResource.Error())
 		}
@@ -64,6 +65,7 @@ func GetDaprStateStoreAzureStorage(resource datamodel.DaprStateStore, applicatio
 				handlers.StorageAccountNameKey: azuretableStorageID.TypeSegments()[0].Name,
 				handlers.ResourceName:          resource.Name,
 			},
+			RadiusManaged: to.BoolPtr(true),
 		},
 	}
 	return outputResources, nil

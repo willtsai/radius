@@ -22,6 +22,7 @@ import (
 	"github.com/project-radius/radius/pkg/ucp/resources"
 )
 
+// NewCommand creates an instance of the command and runner for the `rad env switch` command.
 func NewCommand(factory framework.Factory) (*cobra.Command, framework.Runner) {
 	runner := NewRunner(factory)
 
@@ -40,27 +41,28 @@ func NewCommand(factory framework.Factory) (*cobra.Command, framework.Runner) {
 	return cmd, runner
 }
 
+// Runner is the runner implementation for the `rad env switch` command.
 type Runner struct {
-	ConfigHolder        *framework.ConfigHolder
-	Output              output.Interface
-	Workspace           *workspaces.Workspace
-	ApplicationName     string
-	EnvironmentId       resources.ID
-	EnvironmentName     string
-	Scope               resources.ID
-	ConnectionFactory   connections.Factory
-	AppManagementClient clients.ApplicationsManagementClient
+	ConfigHolder      *framework.ConfigHolder
+	Output            output.Interface
+	Workspace         *workspaces.Workspace
+	ApplicationName   string
+	EnvironmentId     resources.ID
+	EnvironmentName   string
+	Scope             resources.ID
+	ConnectionFactory connections.Factory
 }
 
+// NewRunner creates a new instance of the `rad env switch` runner.
 func NewRunner(factory framework.Factory) *Runner {
 	return &Runner{
-		ConfigHolder:        factory.GetConfigHolder(),
-		Output:              factory.GetOutput(),
-		ConnectionFactory:   factory.GetConnectionFactory(),
-		AppManagementClient: factory.GetAppManagementClient(),
+		ConfigHolder:      factory.GetConfigHolder(),
+		Output:            factory.GetOutput(),
+		ConnectionFactory: factory.GetConnectionFactory(),
 	}
 }
 
+// Validate runs validation for the `rad env switch` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 	config := r.ConfigHolder.Config
 
@@ -69,6 +71,11 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	r.Workspace = workspace
+
+	if !r.Workspace.IsEditableWorkspace() {
+		// Only workspaces stored in configuration can be modified.
+		return workspaces.ErrEditableWorkspaceRequired
+	}
 
 	r.EnvironmentName, err = cli.RequireEnvironmentNameArgs(cmd, args, *r.Workspace)
 	if err != nil {
@@ -89,15 +96,14 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	r.AppManagementClient, err = r.ConnectionFactory.CreateApplicationsManagementClient(cmd.Context(), *r.Workspace)
+	client, err := r.ConnectionFactory.CreateApplicationsManagementClient(cmd.Context(), *r.Workspace)
 	if err != nil {
 		return err
 	}
 
 	// Validate that the environment exists
-	_, err = r.AppManagementClient.GetEnvDetails(cmd.Context(), r.EnvironmentName)
-
-	if cli.Is404ErrorForAzureError(err) {
+	_, err = client.GetEnvDetails(cmd.Context(), r.EnvironmentName)
+	if clients.Is404Error(err) {
 		return &cli.FriendlyError{Message: fmt.Sprintf("Unable to switch environments as requested environment %s does not exist.\n", r.EnvironmentName)}
 	} else if err != nil {
 		return err
@@ -118,6 +124,7 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// Run runs the `rad env switch` command.
 func (r *Runner) Run(ctx context.Context) error {
 	err := cli.EditWorkspaces(ctx, r.ConfigHolder.Config, func(section *cli.WorkspaceSection) error {
 		r.Workspace.Environment = r.EnvironmentId.String()

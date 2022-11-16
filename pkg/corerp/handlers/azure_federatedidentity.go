@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi"
@@ -19,17 +20,10 @@ import (
 	"github.com/project-radius/radius/pkg/resourcemodel"
 	"github.com/project-radius/radius/pkg/rp/outputresource"
 	"github.com/project-radius/radius/pkg/ucp/resources"
+	"github.com/project-radius/radius/pkg/ucp/store"
 )
 
 const (
-	// AzureIdentityTypeKey is the key to represent azure identity type.
-	AzureIdentityTypeKey = "AzureIdentityType"
-	// AzureIdentityIDKey is the key to represent azure identity resource id.
-	AzureIdentityIDKey = "AzureIdentityID"
-	// AzureIdentityClientIDKey is the key to represent the client id of identity.
-	AzureIdentityClientIDKey = "clientID"
-	// AzureIdentityTenantIDKey is the key to represent the tenant id of identity.
-	AzureIdentityTenantIDKey = "tenantID"
 	// AzureFederatedIdentityAudience represents the Azure AD OIDC target audience.
 	AzureFederatedIdentityAudience = "api://AzureADTokenExchange"
 
@@ -42,8 +36,34 @@ const (
 )
 
 var (
-	ErrInvalidIdentity = errors.New("invalid identity property")
+	// Federated identity is still in preview.
+	// The below regions are not supported.
+	// Reference: https://learn.microsoft.com/en-us/azure/active-directory/develop/workload-identity-federation-considerations#unsupported-regions-user-assigned-managed-identities
+	federatedUnsupportedRegions = []string{
+		"Germany North",
+		"Sweden South",
+		"Sweden Central",
+		"Switzerland West",
+		"Brazil Southeast",
+		"East Asia",
+		"Southeast Asia",
+		"Switzerland West",
+		"South Africa West",
+		"Qatar Central",
+		"Australia Central",
+		"Australia Central2",
+		"Norway West",
+	}
 )
+
+func isFederatedIdentitySupported(region string) bool {
+	for _, r := range federatedUnsupportedRegions {
+		if strings.EqualFold(r, region) {
+			return false
+		}
+	}
+	return true
+}
 
 // GetKubeAzureSubject constructs the federated identity subject with Kuberenetes namespace and service account name.
 func GetKubeAzureSubject(namespace, saName string) string {
@@ -60,29 +80,50 @@ type azureFederatedIdentityHandler struct {
 }
 
 // Put creates or updates the federated identity resource of the azure identity.
-func (handler *azureFederatedIdentityHandler) Put(ctx context.Context, resource *outputresource.OutputResource) error {
+func (handler *azureFederatedIdentityHandler) Put(ctx context.Context, options *PutOptions) (map[string]string, error) {
 	logger := radlogger.GetLogger(ctx)
-	ri, err := handler.GetResourceIdentity(ctx, *resource)
-	if err != nil {
-		return err
+
+	// Get dependencies
+	identityProp, ok := options.DependencyProperties[outputresource.LocalIDUserAssignedManagedIdentity]
+	if !ok {
+		return nil, errors.New("missing dependency: a user assigned identity is required to create role assignment")
 	}
 
-	identity, ok := ri.Data.(resourcemodel.AzureFederatedIdentity)
-	if !ok {
-		return ErrInvalidIdentity
+	identityID, err := GetMapValue[string](identityProp, UserAssignedIdentityIDKey)
+	if err != nil {
+		return nil, errors.New("fails to get identity resource id")
+	}
+
+	rs := options.Resource.Resource
+	federatedName, err := GetMapValue[string](rs, FederatedIdentityNameKey)
+	if err != nil {
+		return nil, err
+	}
+	issuer, err := GetMapValue[string](rs, FederatedIdentityIssuerKey)
+	if err != nil {
+		return nil, err
+	}
+	subject, err := GetMapValue[string](rs, FederatedIdentitySubjectKey)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = resources.ParseResource(identityID)
+	if err != nil {
+		return nil, err
 	}
 
 	params := armmsi.FederatedIdentityCredential{
 		Properties: &armmsi.FederatedIdentityCredentialProperties{
 			Audiences: []*string{to.Ptr(AzureFederatedIdentityAudience)},
-			Issuer:    to.Ptr(identity.OIDCIssuer),
-			Subject:   to.Ptr(identity.Subject),
+			Issuer:    to.Ptr(issuer),
+			Subject:   to.Ptr(subject),
 		},
 	}
 
-	rID, err := resources.ParseResource(identity.Resource)
+	rID, err := resources.ParseResource(identityID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	subID := rID.FindScope(resources.SubscriptionsSegment)
@@ -90,57 +131,22 @@ func (handler *azureFederatedIdentityHandler) Put(ctx context.Context, resource 
 
 	client, err := clientv2.NewFederatedIdentityClient(subID, &handler.arm.ClientOption)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// Populating the federated identity credendial changes takes some time. Therefore, POD will take some time to start.
-	// User will encounter the error when the given identity has more than 20 federated identity credentials.
-	_, err = client.CreateOrUpdate(ctx, rgName, rID.Name(), identity.Name, params, nil)
+	// Populating the federated identity credential changes takes some time. Therefore, POD will take some time to start.
+	_, err = client.CreateOrUpdate(ctx, rgName, rID.Name(), federatedName, params, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// WORKAROUND: Ensure that federal identity credential is populated. (Why not they provide async api?)
-	_, err = client.Get(ctx, rgName, rID.Name(), identity.Name, nil)
+	_, err = client.Get(ctx, rgName, rID.Name(), federatedName, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	resource.Identity = ri
-	logger.WithValues(
-		radlogger.LogFieldResourceID, identity,
-		radlogger.LogFieldLocalID, outputresource.LocalIDFederatedIdentity).Info("Created federated identity for Azure AD identity.")
-
-	return nil
-}
-
-func (handler *azureFederatedIdentityHandler) GetResourceIdentity(ctx context.Context, resource outputresource.OutputResource) (resourcemodel.ResourceIdentity, error) {
-	var identity resourcemodel.ResourceIdentity
-
-	props, err := handler.GetResourceNativeIdentityKeyProperties(ctx, resource)
-	if err != nil {
-		return identity, err
-	}
-
-	identityID, err := GetString(props, UserAssignedIdentityNameKey)
-	if err != nil {
-		return identity, err
-	}
-
-	federatedName, err := GetString(props, FederatedIdentityNameKey)
-	if err != nil {
-		return identity, err
-	}
-	issuer, err := GetString(props, FederatedIdentityIssuerKey)
-	if err != nil {
-		return identity, err
-	}
-	subject, err := GetString(props, FederatedIdentitySubjectKey)
-	if err != nil {
-		return identity, err
-	}
-
-	identity = resourcemodel.ResourceIdentity{
+	options.Resource.Identity = resourcemodel.ResourceIdentity{
 		ResourceType: &resourcemodel.ResourceType{
 			Type:     resourcekinds.AzureFederatedIdentity,
 			Provider: resourcemodel.ProviderAzure,
@@ -153,39 +159,22 @@ func (handler *azureFederatedIdentityHandler) GetResourceIdentity(ctx context.Co
 			Name:       federatedName,
 		},
 	}
-	return identity, nil
+
+	logger.WithValues(
+		radlogger.LogFieldResourceID, identityID,
+		radlogger.LogFieldLocalID, outputresource.LocalIDFederatedIdentity).Info("Created federated identity for Azure AD identity.")
+
+	return map[string]string{}, nil
 }
 
-func (handler *azureFederatedIdentityHandler) GetResourceNativeIdentityKeyProperties(ctx context.Context, resource outputresource.OutputResource) (map[string]string, error) {
-	properties, ok := resource.Resource.(map[string]string)
-	if !ok {
-		return properties, ErrInvalidIdentity
-	}
-
-	identityID, err := GetString(resource.Resource, UserAssignedIdentityNameKey)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = resources.ParseResource(identityID)
-	if err != nil {
-		return nil, err
-	}
-
-	return properties, nil
-}
-
-func (handler *azureFederatedIdentityHandler) Delete(ctx context.Context, resource outputresource.OutputResource) error {
-	identityID, err := GetString(resource.Identity.Data, "resource")
-	if err != nil {
-		return err
-	}
-	name, err := GetString(resource.Identity.Data, "name")
-	if err != nil {
+// Delete deletes the federated identity credential.
+func (handler *azureFederatedIdentityHandler) Delete(ctx context.Context, options *DeleteOptions) error {
+	fi := &resourcemodel.AzureFederatedIdentity{}
+	if err := store.DecodeMap(options.Resource.Identity.Data, fi); err != nil {
 		return err
 	}
 
-	rID, err := resources.ParseResource(identityID)
+	rID, err := resources.ParseResource(fi.Resource)
 	if err != nil {
 		return err
 	}
@@ -195,6 +184,6 @@ func (handler *azureFederatedIdentityHandler) Delete(ctx context.Context, resour
 		return err
 	}
 
-	_, err = client.Delete(ctx, rID.FindScope(resources.ResourceGroupsSegment), rID.Name(), name, nil)
+	_, err = client.Delete(ctx, rID.FindScope(resources.ResourceGroupsSegment), rID.Name(), fi.Name, nil)
 	return err
 }

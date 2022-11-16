@@ -37,6 +37,20 @@ func (m *MockApplicationsManagementClient) EXPECT() *MockApplicationsManagementC
 	return m.recorder
 }
 
+// CreateApplicationIfNotFound mocks base method.
+func (m *MockApplicationsManagementClient) CreateApplicationIfNotFound(arg0 context.Context, arg1 string, arg2 v20220315privatepreview.ApplicationResource) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateApplicationIfNotFound", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateApplicationIfNotFound indicates an expected call of CreateApplicationIfNotFound.
+func (mr *MockApplicationsManagementClientMockRecorder) CreateApplicationIfNotFound(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateApplicationIfNotFound", reflect.TypeOf((*MockApplicationsManagementClient)(nil).CreateApplicationIfNotFound), arg0, arg1, arg2)
+}
+
 // CreateEnvironment mocks base method.
 func (m *MockApplicationsManagementClient) CreateEnvironment(arg0 context.Context, arg1, arg2, arg3, arg4, arg5 string, arg6 map[string]*v20220315privatepreview.EnvironmentRecipeProperties, arg7 *v20220315privatepreview.Providers, arg8 bool) (bool, error) {
 	m.ctrl.T.Helper()
@@ -50,6 +64,20 @@ func (m *MockApplicationsManagementClient) CreateEnvironment(arg0 context.Contex
 func (mr *MockApplicationsManagementClientMockRecorder) CreateEnvironment(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEnvironment", reflect.TypeOf((*MockApplicationsManagementClient)(nil).CreateEnvironment), arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+}
+
+// CreateOrUpdateApplication mocks base method.
+func (m *MockApplicationsManagementClient) CreateOrUpdateApplication(arg0 context.Context, arg1 string, arg2 v20220315privatepreview.ApplicationResource) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateOrUpdateApplication", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateOrUpdateApplication indicates an expected call of CreateOrUpdateApplication.
+func (mr *MockApplicationsManagementClientMockRecorder) CreateOrUpdateApplication(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrUpdateApplication", reflect.TypeOf((*MockApplicationsManagementClient)(nil).CreateOrUpdateApplication), arg0, arg1, arg2)
 }
 
 // CreateUCPGroup mocks base method.
@@ -232,19 +260,34 @@ func (mr *MockApplicationsManagementClientMockRecorder) ListApplications(arg0 in
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListApplications", reflect.TypeOf((*MockApplicationsManagementClient)(nil).ListApplications), arg0)
 }
 
-// ListEnv mocks base method.
-func (m *MockApplicationsManagementClient) ListEnv(arg0 context.Context) ([]v20220315privatepreview.EnvironmentResource, error) {
+// ListEnvironmentsAll mocks base method.
+func (m *MockApplicationsManagementClient) ListEnvironmentsAll(arg0 context.Context) ([]v20220315privatepreview.EnvironmentResource, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListEnv", arg0)
+	ret := m.ctrl.Call(m, "ListEnvironmentsAll", arg0)
 	ret0, _ := ret[0].([]v20220315privatepreview.EnvironmentResource)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListEnv indicates an expected call of ListEnv.
-func (mr *MockApplicationsManagementClientMockRecorder) ListEnv(arg0 interface{}) *gomock.Call {
+// ListEnvironmentsAll indicates an expected call of ListEnvironmentsAll.
+func (mr *MockApplicationsManagementClientMockRecorder) ListEnvironmentsAll(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnv", reflect.TypeOf((*MockApplicationsManagementClient)(nil).ListEnv), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnvironmentsAll", reflect.TypeOf((*MockApplicationsManagementClient)(nil).ListEnvironmentsAll), arg0)
+}
+
+// ListEnvironmentsInResourceGroup mocks base method.
+func (m *MockApplicationsManagementClient) ListEnvironmentsInResourceGroup(arg0 context.Context) ([]v20220315privatepreview.EnvironmentResource, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEnvironmentsInResourceGroup", arg0)
+	ret0, _ := ret[0].([]v20220315privatepreview.EnvironmentResource)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEnvironmentsInResourceGroup indicates an expected call of ListEnvironmentsInResourceGroup.
+func (mr *MockApplicationsManagementClientMockRecorder) ListEnvironmentsInResourceGroup(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEnvironmentsInResourceGroup", reflect.TypeOf((*MockApplicationsManagementClient)(nil).ListEnvironmentsInResourceGroup), arg0)
 }
 
 // ListUCPGroup mocks base method.

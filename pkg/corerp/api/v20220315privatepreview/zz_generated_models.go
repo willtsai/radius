@@ -82,9 +82,6 @@ type AzureKeyVaultVolumeProperties struct {
 	// REQUIRED; Specifies the resource id of the application
 	Application *string `json:"application,omitempty"`
 
-	// REQUIRED; Configuration for supported external identity providers
-	Identity *IdentitySettings `json:"identity,omitempty"`
-
 	// REQUIRED; The volume kind
 	Kind *string `json:"kind,omitempty"`
 
@@ -157,6 +154,8 @@ type ConnectionProperties struct {
 	// REQUIRED; The source of the connection
 	Source *string `json:"source,omitempty"`
 	DisableDefaultEnvVars *bool `json:"disableDefaultEnvVars,omitempty"`
+
+	// The properties of IAM
 	Iam *IamProperties `json:"iam,omitempty"`
 }
 
@@ -218,6 +217,9 @@ type ContainerProperties struct {
 
 	// Extensions spec of the resource
 	Extensions []ExtensionClassification `json:"extensions,omitempty"`
+
+	// Configuration for supported external identity providers
+	Identity *IdentitySettings `json:"identity,omitempty"`
 
 	// READ-ONLY; Gets the status of the container at the time the operation was called.
 	ProvisioningState *ProvisioningState `json:"provisioningState,omitempty" azure:"ro"`
@@ -492,7 +494,7 @@ type ExecHealthProbeProperties struct {
 	// Interval for the readiness/liveness probe in seconds
 	PeriodSeconds *float32 `json:"periodSeconds,omitempty"`
 
-	// Number of seconds after which the readiness/liveness probe times out. Defaults to 5 second
+	// Number of seconds after which the readiness/liveness probe times out. Defaults to 5 seconds
 	TimeoutSeconds *float32 `json:"timeoutSeconds,omitempty"`
 }
 
@@ -542,6 +544,9 @@ type GatewayProperties struct {
 	// Sets Gateway to not be exposed externally (no public IP address associated). Defaults to false (exposed to internet).
 	Internal *bool `json:"internal,omitempty"`
 
+	// TLS configuration for the Gateway.
+	TLS *GatewayPropertiesTLS `json:"tls,omitempty"`
+
 	// READ-ONLY; Provisioning state of the Gateway at the time the operation was called.
 	ProvisioningState *ProvisioningState `json:"provisioningState,omitempty" azure:"ro"`
 
@@ -562,6 +567,12 @@ type GatewayPropertiesHostname struct {
 	// Specify a prefix for the hostname: myhostname.myapp.PUBLICHOSTNAMEORIP.nip.io. Mutually exclusive with 'fullyQualifiedHostname'
 // and will be overridden if both are defined.
 	Prefix *string `json:"prefix,omitempty"`
+}
+
+// GatewayPropertiesTLS - TLS configuration for the Gateway.
+type GatewayPropertiesTLS struct {
+	// If true, gateway lets the https traffic passthrough to the backend servers for decryption.
+	SSLPassThrough *bool `json:"sslPassThrough,omitempty"`
 }
 
 // GatewayResource - Gateway Resource that specifies how traffic is exposed to the application.
@@ -657,7 +668,7 @@ type HTTPGetHealthProbeProperties struct {
 	// Interval for the readiness/liveness probe in seconds
 	PeriodSeconds *float32 `json:"periodSeconds,omitempty"`
 
-	// Number of seconds after which the readiness/liveness probe times out. Defaults to 5 second
+	// Number of seconds after which the readiness/liveness probe times out. Defaults to 5 seconds
 	TimeoutSeconds *float32 `json:"timeoutSeconds,omitempty"`
 }
 
@@ -780,13 +791,14 @@ type HealthProbeProperties struct {
 	// Interval for the readiness/liveness probe in seconds
 	PeriodSeconds *float32 `json:"periodSeconds,omitempty"`
 
-	// Number of seconds after which the readiness/liveness probe times out. Defaults to 5 second
+	// Number of seconds after which the readiness/liveness probe times out. Defaults to 5 seconds
 	TimeoutSeconds *float32 `json:"timeoutSeconds,omitempty"`
 }
 
 // GetHealthProbeProperties implements the HealthProbePropertiesClassification interface for type HealthProbeProperties.
 func (h *HealthProbeProperties) GetHealthProbeProperties() *HealthProbeProperties { return h }
 
+// IamProperties - The properties of IAM
 type IamProperties struct {
 	// REQUIRED; The kind of IAM provider to configure
 	Kind *Kind `json:"kind,omitempty"`
@@ -802,7 +814,7 @@ type IdentitySettings struct {
 	// The URI for your compute platform's OIDC issuer
 	OidcIssuer *string `json:"oidcIssuer,omitempty"`
 
-	// The resource ID of the Azure AD user-assigned managed identity to use when 'kind' of 'azure.com.workload' is specified
+	// The resource ID of the provisioned identity
 	Resource *string `json:"resource,omitempty"`
 }
 
@@ -961,7 +973,7 @@ type TCPHealthProbeProperties struct {
 	// Interval for the readiness/liveness probe in seconds
 	PeriodSeconds *float32 `json:"periodSeconds,omitempty"`
 
-	// Number of seconds after which the readiness/liveness probe times out. Defaults to 5 second
+	// Number of seconds after which the readiness/liveness probe times out. Defaults to 5 seconds
 	TimeoutSeconds *float32 `json:"timeoutSeconds,omitempty"`
 }
 

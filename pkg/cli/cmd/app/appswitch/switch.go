@@ -20,6 +20,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// NewCommand creates an instance of the command and runner for the `rad app switch` command.
 func NewCommand(factory framework.Factory) (*cobra.Command, framework.Runner) {
 	runner := NewRunner(factory)
 	cmd := &cobra.Command{
@@ -37,24 +38,25 @@ func NewCommand(factory framework.Factory) (*cobra.Command, framework.Runner) {
 	return cmd, runner
 }
 
+// Runner is the runner implementation for the `rad app switch` command.
 type Runner struct {
-	ConfigHolder        *framework.ConfigHolder
-	Output              output.Interface
-	Workspace           *workspaces.Workspace
-	ApplicationName     string
-	ConnectionFactory   connections.Factory
-	AppManagementClient clients.ApplicationsManagementClient
+	ConfigHolder      *framework.ConfigHolder
+	Output            output.Interface
+	Workspace         *workspaces.Workspace
+	ApplicationName   string
+	ConnectionFactory connections.Factory
 }
 
+// NewRunner creates a new instance of the `rad app switch` runner.
 func NewRunner(factory framework.Factory) *Runner {
 	return &Runner{
-		ConfigHolder:        factory.GetConfigHolder(),
-		Output:              factory.GetOutput(),
-		ConnectionFactory:   factory.GetConnectionFactory(),
-		AppManagementClient: factory.GetAppManagementClient(),
+		ConfigHolder:      factory.GetConfigHolder(),
+		Output:            factory.GetOutput(),
+		ConnectionFactory: factory.GetConnectionFactory(),
 	}
 }
 
+// Validate runs validation for the `rad app switch` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 	config := r.ConfigHolder.Config
 
@@ -63,6 +65,11 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	r.Workspace = workspace
+
+	if !r.Workspace.IsEditableWorkspace() {
+		// Only workspaces stored in configuration can be modified.
+		return workspaces.ErrEditableWorkspaceRequired
+	}
 
 	r.ApplicationName, err = cli.ReadApplicationNameArgs(cmd, args)
 	if err != nil {
@@ -75,14 +82,14 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	r.AppManagementClient, err = r.ConnectionFactory.CreateApplicationsManagementClient(cmd.Context(), *r.Workspace)
+	client, err := r.ConnectionFactory.CreateApplicationsManagementClient(cmd.Context(), *r.Workspace)
 	if err != nil {
 		return err
 	}
 
 	// Validate that the application exists
-	_, err = r.AppManagementClient.ShowApplication(cmd.Context(), r.ApplicationName)
-	if cli.Is404ErrorForAzureError(err) {
+	_, err = client.ShowApplication(cmd.Context(), r.ApplicationName)
+	if clients.Is404Error(err) {
 		return &cli.FriendlyError{Message: fmt.Sprintf("Unable to switch applications as the requested application %s does not exist.\n", r.ApplicationName)}
 	} else if err != nil {
 		return err
@@ -97,6 +104,7 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// Run runs the `rad app switch` command.
 func (r *Runner) Run(ctx context.Context) error {
 	err := cli.EditWorkspaces(ctx, r.ConfigHolder.Config, func(section *cli.WorkspaceSection) error {
 		r.Workspace.DefaultApplication = r.ApplicationName

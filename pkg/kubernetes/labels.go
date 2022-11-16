@@ -17,18 +17,21 @@ const (
 	LabelRadiusDeployment   = "radius.dev/deployment"
 	LabelRadiusRouteFmt     = "radius.dev/route-%s-%s"
 	LabelRadiusResourceType = "radius.dev/resource-type"
-	AnnotationSecretHash    = "radius.dev/secret-hash"
 	LabelPartOf             = "app.kubernetes.io/part-of"
 	LabelName               = "app.kubernetes.io/name"
 	LabelManagedBy          = "app.kubernetes.io/managed-by"
 
 	// TODO: Are we removing this too?
 	LabelManagedByRadiusRP = "radius-rp"
-	LabelAADPodIdentity    = "aadpodidbinding"
 
 	// TODO: Are we removing this too?
 	FieldManager = "radius-rp"
 	ControlPlane = "radius-control-plane"
+
+	AnnotationSecretHash = "radius.dev/secret-hash"
+
+	// AnnotationIdentityType is the annotation for supported identity.
+	AnnotationIdentityType = "radius.dev/identity-type"
 )
 
 // NOTE: the difference between descriptive labels and selector labels
@@ -89,13 +92,6 @@ func MakeRouteSelectorLabels(application string, resourceType string, route stri
 		// NOTE: pods can serve multiple routes of different types. Therefore we need to encode the
 		// the route's type and name in the *key* to support multiple matches.
 		fmt.Sprintf(LabelRadiusRouteFmt, strings.ToLower(strings.TrimSuffix(resourceType, "Route")), strings.ToLower(route)): "true",
-	}
-}
-
-// MakeAADPodIdentityBindingLabels returns a map binding the Pod Identity name to the pod
-func MakeAADPodIdentityBindingLabels(podIdentityName string) map[string]string {
-	return map[string]string{
-		LabelAADPodIdentity: podIdentityName,
 	}
 }
 

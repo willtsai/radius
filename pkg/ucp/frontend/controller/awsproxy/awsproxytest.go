@@ -26,6 +26,9 @@ const (
 	testPrimaryIdentifier1          = "abc"
 	testPrimaryIdentifier2          = "xyz"
 	testMultiIdentifierResourceType = "AWS.RedShift/EndpointAuthorization"
+	testHost                        = "localhost:5000"
+	testlocationHeader              = "http://localhost:5000/planes/aws/aws/accounts/1234567/regions/us-east-1/providers/AWS.Kinesis/locations/global/operationResults/79b9f0da-4882-4dc8-a367-6fd3bc122ded"
+	testazureAsyncOpHeader          = "http://localhost:5000/planes/aws/aws/accounts/1234567/regions/us-east-1/providers/AWS.Kinesis/locations/global/operationStatuses/79b9f0da-4882-4dc8-a367-6fd3bc122ded"
 )
 
 type TestOptions struct {
@@ -37,11 +40,11 @@ type TestOptions struct {
 // setupTest returns a TestOptions struct with mocked AWS and Storage clients
 func setupTest(t *testing.T) TestOptions {
 	mockCtrl := gomock.NewController(t)
-	mockClient := awsclient.NewMockAWSCloudControlClient(mockCtrl)
+	mockCloudControlClient := awsclient.NewMockAWSCloudControlClient(mockCtrl)
 	mockCloudFormationClient := awsclient.NewMockAWSCloudFormationClient(mockCtrl)
 	mockStorageClient := store.NewMockStorageClient(mockCtrl)
 	return TestOptions{
-		AWSCloudControlClient:   mockClient,
+		AWSCloudControlClient:   mockCloudControlClient,
 		AWSCloudFormationClient: mockCloudFormationClient,
 		StorageClient:           mockStorageClient,
 	}

@@ -98,6 +98,7 @@
 * **container**: [Container](#container) (Required): Definition of a container.
 * **environment**: string: The resource id of the environment linked to the resource
 * **extensions**: [Extension](#extension)[]: Extensions spec of the resource
+* **identity**: [IdentitySettings](#identitysettings)
 * **provisioningState**: 'Accepted' | 'Canceled' | 'Deleting' | 'Failed' | 'Provisioning' | 'Succeeded' | 'Updating' (ReadOnly): Provisioning state of the resource at the time the operation was called.
 * **status**: [ResourceStatus](#resourcestatus) (ReadOnly): Status of a resource.
 
@@ -109,7 +110,7 @@
 ## ConnectionProperties
 ### Properties
 * **disableDefaultEnvVars**: bool
-* **iam**: [IamProperties](#iamproperties)
+* **iam**: [IamProperties](#iamproperties): The properties of IAM
 * **source**: string (Required): The source of the connection
 
 ## IamProperties
@@ -141,7 +142,7 @@
 * **failureThreshold**: int: Threshold number of times the probe fails after which a failure would be reported
 * **initialDelaySeconds**: int: Initial delay in seconds before probing for readiness/liveness
 * **periodSeconds**: int: Interval for the readiness/liveness probe in seconds
-* **timeoutSeconds**: int: Number of seconds after which the readiness/liveness probe times out. Defaults to 5 second
+* **timeoutSeconds**: int: Number of seconds after which the readiness/liveness probe times out. Defaults to 5 seconds
 ### ExecHealthProbeProperties
 #### Properties
 * **command**: string (Required): Command to execute to probe readiness/liveness
@@ -217,6 +218,12 @@
 * **replicas**: int: Replica count.
 
 
+## IdentitySettings
+### Properties
+* **kind**: 'azure.com.workload' | 'undefined' (Required): Configuration for supported external identity providers
+* **oidcIssuer**: string: The URI for your compute platform's OIDC issuer
+* **resource**: string: The resource ID of the provisioned identity
+
 ## ResourceStatus
 ### Properties
 * **outputResources**: any[]: Array of AnyObject
@@ -245,12 +252,6 @@
 * **kind**: 'kubernetes' (Required): Type of compute resource.
 * **namespace**: string (Required): The namespace to use for the environment.
 
-
-## IdentitySettings
-### Properties
-* **kind**: 'azure.com.systemassigned' | 'azure.com.workload' (Required): Configuration for supported external identity providers
-* **oidcIssuer**: string: The URI for your compute platform's OIDC issuer
-* **resource**: string: The resource ID of the Azure AD user-assigned managed identity to use when 'kind' of 'azure.com.workload' is specified
 
 ## Providers
 ### Properties
@@ -284,6 +285,7 @@
 * **provisioningState**: 'Accepted' | 'Canceled' | 'Deleting' | 'Failed' | 'Provisioning' | 'Succeeded' | 'Updating' (ReadOnly): Provisioning state of the resource at the time the operation was called.
 * **routes**: [GatewayRoute](#gatewayroute)[] (Required): Routes attached to this Gateway
 * **status**: [ResourceStatus](#resourcestatus) (ReadOnly): Status of a resource.
+* **tls**: [GatewayPropertiesTls](#gatewaypropertiestls): TLS configuration for the Gateway.
 * **url**: string (ReadOnly): URL of the gateway resource. Readonly.
 
 ## GatewayPropertiesHostname
@@ -296,6 +298,10 @@
 * **destination**: string: The HttpRoute to route to. Ex - myserviceroute.id.
 * **path**: string: The path to match the incoming request path on. Ex - /myservice.
 * **replacePrefix**: string: Optionally update the prefix when sending the request to the service. Ex - replacePrefix: '/' and path: '/myservice' will transform '/myservice/myroute' to '/myroute'
+
+## GatewayPropertiesTls
+### Properties
+* **sslPassThrough**: bool: If true, gateway lets the https traffic passthrough to the backend servers for decryption.
 
 ## TrackedResourceTags
 ### Properties
@@ -329,7 +335,6 @@
 ### AzureKeyVaultVolumeProperties
 #### Properties
 * **certificates**: [AzureKeyVaultVolumePropertiesCertificates](#azurekeyvaultvolumepropertiescertificates): The KeyVault certificates that this volume exposes
-* **identity**: [IdentitySettings](#identitysettings) (Required)
 * **keys**: [AzureKeyVaultVolumePropertiesKeys](#azurekeyvaultvolumepropertieskeys): The KeyVault keys that this volume exposes
 * **kind**: 'azure.com.keyvault' (Required): The volume kind
 * **resource**: string (Required): The ID of the keyvault to use for this volume resource
