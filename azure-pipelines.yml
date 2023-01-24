@@ -15,7 +15,14 @@ resources:
 
 trigger: none
 
-pr: [ main, features/*]
+schedules:
+- cron: "0 0 * * *"
+  displayName: Daily midnight build
+  branches:
+    include:
+    - release/0.16
+
+pr: [ main, features/*, release/*]
 
 variables:
 - name: RADIUS_CHART_LOCATION
