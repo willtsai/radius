@@ -16,11 +16,12 @@ resources:
 trigger: none
 
 schedules:
-- cron: "0 0 * * *"
-  displayName: Daily midnight build
+- cron: "0 * * * *"
+  displayName: Daily hour build
   branches:
     include:
-    - release/0.16
+    # - release/0.16
+    - jkotalik/buildsFor16
 
 pr: [ main, features/*, release/*]
 
