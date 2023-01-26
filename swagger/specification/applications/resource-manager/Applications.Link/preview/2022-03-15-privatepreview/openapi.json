@@ -73,7 +73,7 @@
         "tags": [
           "DaprInvokeHttpRoute"
         ],
-        "operationId": "DaprInvokeHttpRoute_ListByRootScope",
+        "operationId": "DaprInvokeHttpRoute_ListByResourceGroup",
         "description": "Lists information about all DaprInvokeHttpRouteResources in the given root scope",
         "parameters": [
           {
@@ -182,19 +182,6 @@
               "$ref": "#/definitions/DaprInvokeHttpRouteResource"
             }
           },
-          "201": {
-            "description": "ARM create operation completed successfully.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            },
-            "schema": {
-              "$ref": "#/definitions/DaprInvokeHttpRouteResource"
-            }
-          },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
@@ -231,16 +218,6 @@
           "200": {
             "description": "Resource deleted successfully."
           },
-          "202": {
-            "description": "Resource deletion accepted.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            }
-          },
           "204": {
             "description": "Resource deleted successfully."
           },
@@ -258,7 +235,7 @@
         "tags": [
           "DaprPubSubBroker"
         ],
-        "operationId": "DaprPubSubBroker_ListByRootScope",
+        "operationId": "DaprPubSubBroker_ListByResourceGroup",
         "description": "Lists information about all DaprPubSubBrokerResources in the given root scope",
         "parameters": [
           {
@@ -367,19 +344,6 @@
               "$ref": "#/definitions/DaprPubSubBrokerResource"
             }
           },
-          "201": {
-            "description": "ARM create operation completed successfully.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            },
-            "schema": {
-              "$ref": "#/definitions/DaprPubSubBrokerResource"
-            }
-          },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
@@ -416,16 +380,6 @@
           "200": {
             "description": "Resource deleted successfully."
           },
-          "202": {
-            "description": "Resource deletion accepted.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            }
-          },
           "204": {
             "description": "Resource deleted successfully."
           },
@@ -443,7 +397,7 @@
         "tags": [
           "DaprSecretStore"
         ],
-        "operationId": "DaprSecretStore_ListByRootScope",
+        "operationId": "DaprSecretStore_ListByResourceGroup",
         "description": "Lists information about all DaprSecretStoreResources in the given root scope",
         "parameters": [
           {
@@ -552,19 +506,6 @@
               "$ref": "#/definitions/DaprSecretStoreResource"
             }
           },
-          "201": {
-            "description": "ARM create operation completed successfully.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            },
-            "schema": {
-              "$ref": "#/definitions/DaprSecretStoreResource"
-            }
-          },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
@@ -601,16 +542,6 @@
           "200": {
             "description": "Resource deleted successfully."
           },
-          "202": {
-            "description": "Resource deletion accepted.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            }
-          },
           "204": {
             "description": "Resource deleted successfully."
           },
@@ -628,7 +559,7 @@
         "tags": [
           "DaprStateStore"
         ],
-        "operationId": "DaprStateStore_ListByRootScope",
+        "operationId": "DaprStateStore_ListByResourceGroup",
         "description": "Lists information about all DaprStateStoreResources in the given root scope",
         "parameters": [
           {
@@ -737,19 +668,6 @@
               "$ref": "#/definitions/DaprStateStoreResource"
             }
           },
-          "201": {
-            "description": "ARM create operation completed successfully.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            },
-            "schema": {
-              "$ref": "#/definitions/DaprStateStoreResource"
-            }
-          },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
@@ -817,7 +735,7 @@
         "tags": [
           "MongoDatabases"
         ],
-        "operationId": "MongoDatabases_ListByRootScope",
+        "operationId": "MongoDatabases_ListByResourceGroup",
         "description": "Lists information about all MongoDatabaseResources in the given root scope",
         "parameters": [
           {
@@ -922,19 +840,6 @@
         "responses": {
           "200": {
             "description": "ARM operation completed successfully.",
-            "schema": {
-              "$ref": "#/definitions/MongoDatabaseResource"
-            }
-          },
-          "201": {
-            "description": "ARM create operation completed successfully.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            },
             "schema": {
               "$ref": "#/definitions/MongoDatabaseResource"
             }
@@ -1044,7 +949,7 @@
         "tags": [
           "RabbitMQMessageQueues"
         ],
-        "operationId": "RabbitMqMessageQueues_ListByRootScope",
+        "operationId": "RabbitMqMessageQueues_ListByResourceGroup",
         "description": "Lists information about all RabbitMQMessageQueueResources in the given root scope",
         "parameters": [
           {
@@ -1151,19 +1056,6 @@
               "$ref": "#/definitions/RabbitMQMessageQueueResource"
             }
           },
-          "201": {
-            "description": "ARM create operation completed successfully.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            },
-            "schema": {
-              "$ref": "#/definitions/RabbitMQMessageQueueResource"
-            }
-          },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
@@ -1198,16 +1090,6 @@
         "responses": {
           "200": {
             "description": "Resource deleted successfully."
-          },
-          "202": {
-            "description": "Resource deletion accepted.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            }
           },
           "204": {
             "description": "Resource deleted successfully."
@@ -1264,7 +1146,7 @@
         "tags": [
           "RedisCaches"
         ],
-        "operationId": "RedisCaches_ListByRootScope",
+        "operationId": "RedisCaches_ListByResourceGroup",
         "description": "Lists information about all RedisCacheResources in the given root scope",
         "parameters": [
           {
@@ -1371,19 +1253,6 @@
               "$ref": "#/definitions/RedisCacheResource"
             }
           },
-          "201": {
-            "description": "ARM create operation completed successfully.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            },
-            "schema": {
-              "$ref": "#/definitions/RedisCacheResource"
-            }
-          },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
@@ -1418,16 +1287,6 @@
         "responses": {
           "200": {
             "description": "Resource deleted successfully."
-          },
-          "202": {
-            "description": "Resource deletion accepted.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            }
           },
           "204": {
             "description": "Resource deleted successfully."
@@ -1484,7 +1343,7 @@
         "tags": [
           "SqlDatabases"
         ],
-        "operationId": "SqlDatabases_ListByRootScope",
+        "operationId": "SqlDatabases_ListByResourceGroup",
         "description": "Lists information about all SqlDatabaseResources in the given root scope",
         "parameters": [
           {
@@ -1593,19 +1452,6 @@
               "$ref": "#/definitions/SqlDatabaseResource"
             }
           },
-          "201": {
-            "description": "ARM create operation completed successfully.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            },
-            "schema": {
-              "$ref": "#/definitions/SqlDatabaseResource"
-            }
-          },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
@@ -1641,16 +1487,6 @@
         "responses": {
           "200": {
             "description": "Resource deleted successfully."
-          },
-          "202": {
-            "description": "Resource deletion accepted.",
-            "headers": {
-              "Retry-After": {
-                "description": "The Retry-After header can indicate how long the client should wait before polling the operation status.",
-                "type": "integer",
-                "format": "int32"
-              }
-            }
           },
           "204": {
             "description": "Resource deleted successfully."
