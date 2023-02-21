@@ -77,7 +77,7 @@ func (r *DeleteResourceGroup) Run(ctx context.Context, w http.ResponseWriter, re
 }
 
 func (e *DeleteResourceGroup) listResources(ctx context.Context, db store.StorageClient, path string) (datamodel.ResourceList, error) {
-	ctx = ucplog.WrapLogContext(ctx, ucplog.LogFieldRequestPath, path)
+	ctx = ucplog.WrapLogContext(ctx, ucplog.LogFieldHTTPRequestURI, path)
 	var query store.Query
 	query.RootScope = path
 	query.ScopeRecursive = true
