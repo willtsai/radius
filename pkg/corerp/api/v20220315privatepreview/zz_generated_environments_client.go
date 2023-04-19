@@ -302,6 +302,56 @@ func (client *EnvironmentsClient) listByScopeHandleResponse(resp *http.Response)
 	return result, nil
 }
 
+// RecipeRegister - Register recipe for the provided environment.
+// If the operation fails it returns an *azcore.ResponseError type.
+// Generated from API version 2022-03-15-privatepreview
+// environmentName - The name of the environment
+// recipeParameter - Resource create parameters.
+// options - EnvironmentsClientRecipeRegisterOptions contains the optional parameters for the EnvironmentsClient.RecipeRegister
+// method.
+func (client *EnvironmentsClient) RecipeRegister(ctx context.Context, environmentName string, recipeParameter Recipe, options *EnvironmentsClientRecipeRegisterOptions) (EnvironmentsClientRecipeRegisterResponse, error) {
+	req, err := client.recipeRegisterCreateRequest(ctx, environmentName, recipeParameter, options)
+	if err != nil {
+		return EnvironmentsClientRecipeRegisterResponse{}, err
+	}
+	resp, err := client.pl.Do(req)
+	if err != nil {
+		return EnvironmentsClientRecipeRegisterResponse{}, err
+	}
+	if !runtime.HasStatusCode(resp, http.StatusOK) {
+		return EnvironmentsClientRecipeRegisterResponse{}, runtime.NewResponseError(resp)
+	}
+	return client.recipeRegisterHandleResponse(resp)
+}
+
+// recipeRegisterCreateRequest creates the RecipeRegister request.
+func (client *EnvironmentsClient) recipeRegisterCreateRequest(ctx context.Context, environmentName string, recipeParameter Recipe, options *EnvironmentsClientRecipeRegisterOptions) (*policy.Request, error) {
+	urlPath := "/{rootScope}/providers/Applications.Core/environments/{environmentName}/registerrecipe"
+	urlPath = strings.ReplaceAll(urlPath, "{rootScope}", client.rootScope)
+	if environmentName == "" {
+		return nil, errors.New("parameter environmentName cannot be empty")
+	}
+	urlPath = strings.ReplaceAll(urlPath, "{environmentName}", url.PathEscape(environmentName))
+	req, err := runtime.NewRequest(ctx, http.MethodPost, runtime.JoinPaths(client.host, urlPath))
+	if err != nil {
+		return nil, err
+	}
+	reqQP := req.Raw().URL.Query()
+	reqQP.Set("api-version", "2022-03-15-privatepreview")
+	req.Raw().URL.RawQuery = reqQP.Encode()
+	req.Raw().Header["Accept"] = []string{"application/json"}
+	return req, runtime.MarshalAsJSON(req, recipeParameter)
+}
+
+// recipeRegisterHandleResponse handles the RecipeRegister response.
+func (client *EnvironmentsClient) recipeRegisterHandleResponse(resp *http.Response) (EnvironmentsClientRecipeRegisterResponse, error) {
+	result := EnvironmentsClientRecipeRegisterResponse{}
+	if err := runtime.UnmarshalAsJSON(resp, &result.Recipe); err != nil {
+		return EnvironmentsClientRecipeRegisterResponse{}, err
+	}
+	return result, nil
+}
+
 // Update - Update the properties of an existing Environment.
 // If the operation fails it returns an *azcore.ResponseError type.
 // Generated from API version 2022-03-15-privatepreview

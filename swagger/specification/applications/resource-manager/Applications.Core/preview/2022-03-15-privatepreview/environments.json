@@ -272,10 +272,10 @@
         }
       }
     },
-    "/{rootScope}/providers/Applications.Core/environments/{environmentName}/registerRecipe": {
+    "/{rootScope}/providers/Applications.Core/environments/{environmentName}/registerrecipe": {
       "post": {
         "description": "Register recipe for the provided environment.",
-        "operationId": "RecipeRegister",
+        "operationId": "Environments_RecipeRegister",
         "produces": [
           "application/json"
         ],

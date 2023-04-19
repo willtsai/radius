@@ -159,12 +159,6 @@ type ApplicationsClientUpdateOptions struct {
 	// placeholder for future optional parameters
 }
 
-// ApplicationsCoreManagementAPIsClientRecipeRegisterOptions contains the optional parameters for the ApplicationsCoreManagementAPIsClient.RecipeRegister
-// method.
-type ApplicationsCoreManagementAPIsClientRecipeRegisterOptions struct {
-	// placeholder for future optional parameters
-}
-
 type AzureKeyVaultVolumeProperties struct {
 	// REQUIRED; Specifies the resource id of the application
 	Application *string `json:"application,omitempty"`
@@ -625,6 +619,11 @@ type EnvironmentsClientGetRecipeMetadataOptions struct {
 
 // EnvironmentsClientListByScopeOptions contains the optional parameters for the EnvironmentsClient.ListByScope method.
 type EnvironmentsClientListByScopeOptions struct {
+	// placeholder for future optional parameters
+}
+
+// EnvironmentsClientRecipeRegisterOptions contains the optional parameters for the EnvironmentsClient.RecipeRegister method.
+type EnvironmentsClientRecipeRegisterOptions struct {
 	// placeholder for future optional parameters
 }
 
