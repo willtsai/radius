@@ -159,6 +159,12 @@ type ApplicationsClientUpdateOptions struct {
 	// placeholder for future optional parameters
 }
 
+// ApplicationsCoreManagementAPIsClientRecipeRegisterOptions contains the optional parameters for the ApplicationsCoreManagementAPIsClient.RecipeRegister
+// method.
+type ApplicationsCoreManagementAPIsClientRecipeRegisterOptions struct {
+	// placeholder for future optional parameters
+}
+
 type AzureKeyVaultVolumeProperties struct {
 	// REQUIRED; Specifies the resource id of the application
 	Application *string `json:"application,omitempty"`
@@ -1123,6 +1129,21 @@ type ProvidersAws struct {
 type ProvidersAzure struct {
 	// Target scope for Azure resources to be deployed into. For example: '/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/testGroup'
 	Scope *string `json:"scope,omitempty"`
+}
+
+// Recipe - The recipe used to automatically deploy underlying infrastructure for a link
+type Recipe struct {
+	// Type of the link this recipe can be consumed by. For example: 'Applications.Link/mongoDatabases'
+	LinkType *string `json:"linkType,omitempty"`
+
+	// Key/value parameters to pass to the recipe template at deployment
+	Parameters map[string]interface{} `json:"parameters,omitempty"`
+
+	// The name of the recipe within the environment to use
+	RecipeName *string `json:"recipeName,omitempty"`
+
+	// Path to the template provided by the recipe. Currently only link to Azure Container Registry is supported.
+	TemplatePath *string `json:"templatePath,omitempty"`
 }
 
 // RecipeMetadata - Metadata of a Recipe

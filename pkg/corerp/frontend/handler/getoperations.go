@@ -94,6 +94,16 @@ func (opctrl *GetOperations) availableOperationsV1() *v1.PaginatedList {
 				IsDataAction: false,
 			},
 			&v1.Operation{
+				Name: "Applications.Core/environments/recipeRegister/action",
+				Display: &v1.OperationDisplayProperties{
+					Provider:    ProviderNamespaceName,
+					Resource:    "environments",
+					Operation:   "Register Recipe",
+					Description: "Register Recipe",
+				},
+				IsDataAction: false,
+			},
+			&v1.Operation{
 				Name: "Applications.Core/environments/join/action",
 				Display: &v1.OperationDisplayProperties{
 					Provider:    ProviderNamespaceName,

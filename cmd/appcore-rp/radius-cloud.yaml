@@ -25,7 +25,7 @@ secretProvider:
     inmemory: true
 server:
   host: "0.0.0.0"
-  port: 8080
+  port: 9874
   authType: "ClientCertificate"
   enableArmAuth: true
   armMetadataEndpoint: "https://admin.api-dogfood.resources.windows-int.net/metadata/authentication?api-version=2015-01-01"

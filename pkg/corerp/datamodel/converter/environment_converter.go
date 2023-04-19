@@ -46,3 +46,35 @@ func EnvironmentDataModelFromVersioned(content []byte, version string) (*datamod
 		return nil, v1.ErrUnsupportedAPIVersion
 	}
 }
+
+func RecipeDatamodelToVersioned(model *datamodel.RecipeProperties, version string) (v1.VersionedModelInterface, error) {
+	switch version {
+	case v20220315privatepreview.Version:
+		versioned := &v20220315privatepreview.Recipe{}
+		if err := versioned.ConvertFrom(model); err != nil {
+			return nil, err
+		}
+		return versioned, nil
+
+	default:
+		return nil, v1.ErrUnsupportedAPIVersion
+	}
+}
+
+func RecipeDatamodelFromVersioned(content []byte, version string) (*datamodel.RecipeProperties, error) {
+	switch version {
+	case v20220315privatepreview.Version:
+		am := &v20220315privatepreview.Recipe{}
+		if err := json.Unmarshal(content, am); err != nil {
+			return nil, err
+		}
+		dm, err := am.ConvertTo()
+		if err != nil {
+			return nil, err
+		}
+		return dm.(*datamodel.RecipeProperties), nil
+
+	default:
+		return nil, v1.ErrUnsupportedAPIVersion
+	}
+}

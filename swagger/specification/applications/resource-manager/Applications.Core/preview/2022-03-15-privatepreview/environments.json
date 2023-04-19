@@ -272,6 +272,52 @@
         }
       }
     },
+    "/{rootScope}/providers/Applications.Core/environments/{environmentName}/registerRecipe": {
+      "post": {
+        "description": "Register recipe for the provided environment.",
+        "operationId": "RecipeRegister",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Environments"
+        ],
+        "parameters": [
+          {
+            "$ref": "global.json#/parameters/RootScopeParameter"
+          },
+          {
+            "$ref": "../../../../../common-types/resource-management/v2/types.json#/parameters/ApiVersionParameter"
+          },
+          {
+            "$ref": "#/parameters/EnvironmentNameParameter"
+          },
+          {
+            "name": "RecipeParameter",
+            "in": "body",
+            "required": true,
+            "description": "Resource create parameters.",
+            "schema": {
+              "$ref": "#/definitions/Recipe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ARM operation completed successfully.",
+            "schema": {
+              "$ref": "#/definitions/Recipe"
+            }
+          },
+          "default": {
+            "description": "Error response describing the reason for operation failure",
+            "schema": {
+              "$ref": "../../../../../common-types/resource-management/v2/types.json#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
     "/{rootScope}/providers/Applications.Core/environments/{environmentName}/{recipeName}/getmetadata": {
       "post": {
         "description": "Gets recipe metadata including parameters and any constraints on the parameters.",
@@ -507,6 +553,33 @@
         "linkType",
         "templatePath"
       ]
+    },
+    "Recipe":{
+      "type": "object",
+      "description": "The recipe used to automatically deploy underlying infrastructure for a link",
+      "properties": {
+        "recipeName": {
+          "type": "string",
+          "description": "The name of the recipe within the environment to use"
+        },
+        "linkType": {
+          "description": "Type of the link this recipe can be consumed by. For example: 'Applications.Link/mongoDatabases'",
+          "type": "string"
+        },
+        "templatePath": {
+          "description": "Path to the template provided by the recipe. Currently only link to Azure Container Registry is supported.",
+          "type": "string"
+        },
+        "parameters": {
+          "description": "Key/value parameters to pass to the recipe template at deployment",
+          "type": "object",
+          "example": [
+            {
+              "port": 6060
+            }
+          ]
+        }
+      }
     }
   },
   "parameters": {

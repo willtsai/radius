@@ -61,3 +61,15 @@ type ProvidersAWS struct {
 	// Scope is the target level for deploying the aws resources
 	Scope string `json:"scope,omitempty"`
 }
+
+// EnvironmentRecipeProperties represents the properties of environment's recipe.
+type RecipeProperties struct {
+	Name         string         `json:"recipeName,omitempty"`
+	LinkType     string         `json:"linkType,omitempty"`
+	TemplatePath string         `json:"templatePath,omitempty"`
+	Parameters   map[string]any `json:"parameters,omitempty"`
+}
+
+func (e *RecipeProperties) ResourceTypeName() string {
+	return "Applications.Core/environments"
+}

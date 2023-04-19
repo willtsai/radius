@@ -34,6 +34,11 @@ type ApplicationsClientUpdateResponse struct {
 	ApplicationResource
 }
 
+// ApplicationsCoreManagementAPIsClientRecipeRegisterResponse contains the response from method ApplicationsCoreManagementAPIsClient.RecipeRegister.
+type ApplicationsCoreManagementAPIsClientRecipeRegisterResponse struct {
+	Recipe
+}
+
 // ContainersClientCreateOrUpdateResponse contains the response from method ContainersClient.CreateOrUpdate.
 type ContainersClientCreateOrUpdateResponse struct {
 	ContainerResource

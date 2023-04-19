@@ -10,6 +10,7 @@ const (
 	DevRecipesACRPath = "radius.azurecr.io"
 	// User defined operation names
 	OperationGetRecipeMetadata = "GETRECIPEMETADATA"
+	OperationRegisterRecipe    = "REGISTERRECIPE"
 )
 
 // supportedProviders returns the list of "known" providers we understand for dev recipes.

@@ -260,3 +260,29 @@ func toEnvExtensionDataModel(e EnvironmentExtensionClassification) datamodel.Ext
 
 	return datamodel.Extension{}
 }
+
+// ConvertFrom converts from version-agnostic datamodel to the versioned MongoDatabaseSecrets instance.
+func (dst *Recipe) ConvertFrom(src v1.DataModelInterface) error {
+	recipe, ok := src.(*datamodel.RecipeProperties)
+	if !ok {
+		return v1.ErrInvalidModelConversion
+	}
+
+	dst.RecipeName = to.Ptr(recipe.Name)
+	dst.LinkType = to.Ptr(recipe.LinkType)
+	dst.TemplatePath = to.Ptr(recipe.TemplatePath)
+	dst.Parameters = recipe.Parameters
+
+	return nil
+}
+
+// ConvertTo converts from the versioned MongoDatabaseSecrets instance to version-agnostic datamodel.
+func (src *Recipe) ConvertTo() (v1.DataModelInterface, error) {
+	converted := &datamodel.RecipeProperties{
+		Name:         to.String(src.RecipeName),
+		LinkType:     to.String(src.LinkType),
+		TemplatePath: to.String(src.TemplatePath),
+		Parameters:   src.Parameters,
+	}
+	return converted, nil
+}
