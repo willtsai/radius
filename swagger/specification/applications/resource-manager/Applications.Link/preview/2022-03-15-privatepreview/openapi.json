@@ -2372,9 +2372,6 @@
         }
       },
       "description": "MongoDatabase Properties for Mode Recipe",
-      "required": [
-        "recipe"
-      ],
       "allOf": [
         {
           "$ref": "#/definitions/MongoDatabaseProperties"

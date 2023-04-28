@@ -302,7 +302,7 @@
 * **host**: string: Host name of the target Mongo database
 * **mode**: 'recipe' (Required): Discriminator property for MongoDatabaseProperties.
 * **port**: int: Port value of the target Mongo database
-* **recipe**: [Recipe](#recipe) (Required): The recipe used to automatically deploy underlying infrastructure for a link
+* **recipe**: [Recipe](#recipe): The recipe used to automatically deploy underlying infrastructure for a link
 
 ### ResourceMongoDatabaseProperties
 #### Properties

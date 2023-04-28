@@ -978,9 +978,6 @@ type RecipeMongoDatabaseProperties struct {
 	// REQUIRED; Discriminator property for MongoDatabaseProperties.
 	Mode *string `json:"mode,omitempty"`
 
-	// REQUIRED; The recipe used to automatically deploy underlying infrastructure for the mongodatabases link
-	Recipe *Recipe `json:"recipe,omitempty"`
-
 	// Fully qualified resource ID for the application that the link is consumed by
 	Application *string `json:"application,omitempty"`
 
@@ -989,6 +986,9 @@ type RecipeMongoDatabaseProperties struct {
 
 	// Port value of the target Mongo database
 	Port *int32 `json:"port,omitempty"`
+
+	// The recipe used to automatically deploy underlying infrastructure for the mongodatabases link
+	Recipe *Recipe `json:"recipe,omitempty"`
 
 	// Secrets values provided for the resource
 	Secrets *MongoDatabaseSecrets `json:"secrets,omitempty"`

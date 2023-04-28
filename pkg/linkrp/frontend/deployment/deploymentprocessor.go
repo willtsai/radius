@@ -500,6 +500,9 @@ func (dp *deploymentProcessor) getMetadataFromResource(ctx context.Context, reso
 		basicResource = &obj.Properties.BasicResourceProperties
 		if obj.Properties.Mode == datamodel.LinkModeRecipe {
 			recipe.Name = obj.Properties.Recipe.Name
+			if recipe.Name == "" {
+				recipe.Name = "default"
+			}
 			recipe.Parameters = obj.Properties.Recipe.Parameters
 		}
 	case strings.ToLower(linkrp.SqlDatabasesResourceType):

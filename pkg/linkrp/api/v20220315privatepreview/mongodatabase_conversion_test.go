@@ -61,7 +61,7 @@ func TestMongoDatabase_ConvertVersionedToDataModel(t *testing.T) {
 }
 
 func TestMongoDatabase_ConvertVersionedToDataModel_InvalidRequest(t *testing.T) {
-	testset := []string{"mongodatabaseresource_invalidmode.json", "mongodatabaseresource_invalidmode2.json", "mongodatabaseresource_invalidmode3.json"}
+	testset := []string{"mongodatabaseresource_invalidmode.json", "mongodatabaseresource_invalidmode2.json"}
 	for _, payload := range testset {
 		// arrange
 		rawPayload := loadTestData(payload)
@@ -78,10 +78,6 @@ func TestMongoDatabase_ConvertVersionedToDataModel_InvalidRequest(t *testing.T) 
 			expectedErr.Message = "resource is a required property for mode \"resource\""
 		}
 		if payload == "mongodatabaseresource_invalidmode3.json" {
-			expectedErr.Code = "BadRequest"
-			expectedErr.Message = "recipe is a required property for mode \"recipe\""
-		}
-		if payload == "mongodatabaseresource_invalidmode4.json" {
 			expectedErr.Code = "BadRequest"
 			expectedErr.Message = "rhost and port are required properties for mode \"values\""
 		}

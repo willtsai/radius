@@ -20,6 +20,8 @@ import (
 
 //go:generate mockgen -destination=./mock_config_loader.go -package=configloader -self_package github.com/project-radius/radius/pkg/recipes/configloader github.com/project-radius/radius/pkg/recipes/configloader ConfigurationLoader
 
+const defaultRecipeName = "default"
+
 var _ ConfigurationLoader = (*environmentLoader)(nil)
 
 func NewEnvironmentLoader(armOptions *arm.ClientOptions) ConfigurationLoader {
@@ -97,6 +99,9 @@ func (e *environmentLoader) LoadRecipe(ctx context.Context, recipe recipes.Metad
 	resource, err := resources.ParseResource(recipe.ResourceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse resourceID: %q while building the recipe context parameter %w", recipe.ResourceID, err)
+	}
+	if recipe.Name == "" {
+		recipe.Name = defaultRecipeName
 	}
 	found, ok := environment.Properties.Recipes[resource.Type()][recipe.Name]
 	if !ok {

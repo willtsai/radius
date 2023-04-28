@@ -104,7 +104,7 @@ model RecipeMongoDatabaseProperties extends MongoDatabaseProperties{
   database?: string;
 
   @doc("The recipe used to automatically deploy underlying infrastructure for the mongodatabases link")
-  recipe: Recipe;
+  recipe?: Recipe;
 
   @doc("How to build the Mongo database link. Options are to build automatically via 'recipe' or 'resource', or build manually via 'values'. Selection determines which set of fields to additionally require.")
   mode: "recipe";

@@ -7,8 +7,10 @@ package v20220315privatepreview
 
 import (
 	"fmt"
+	"reflect"
 
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
+	"github.com/project-radius/radius/pkg/linkrp"
 	"github.com/project-radius/radius/pkg/linkrp/datamodel"
 	rpv1 "github.com/project-radius/radius/pkg/rp/v1"
 	"github.com/project-radius/radius/pkg/to"
@@ -70,11 +72,10 @@ func (src *MongoDatabaseResource) ConvertTo() (v1.DataModelInterface, error) {
 		}
 		converted.Properties.Mode = datamodel.LinkModeValues
 	case *RecipeMongoDatabaseProperties:
-		if v.Recipe == nil {
-			return &datamodel.MongoDatabase{}, v1.NewClientErrInvalidRequest(fmt.Sprintf("recipe is a required property for mode %q", datamodel.LinkModeRecipe))
-		}
-		converted.Properties.MongoDatabaseRecipeProperties = datamodel.MongoDatabaseRecipeProperties{
-			Recipe: toRecipeDataModel(v.Recipe),
+		if v.Recipe != nil {
+			converted.Properties.MongoDatabaseRecipeProperties = datamodel.MongoDatabaseRecipeProperties{
+				Recipe: toRecipeDataModel(v.Recipe),
+			}
 		}
 		converted.Properties.Host = to.String(v.Host)
 		converted.Properties.Port = to.Int32(v.Port)
@@ -139,9 +140,11 @@ func (dst *MongoDatabaseResource) ConvertFrom(src v1.DataModelInterface) error {
 		}
 	case datamodel.LinkModeRecipe:
 		mode := "recipe"
-		dst.Properties = &RecipeMongoDatabaseProperties{
-			Mode:     &mode,
-			Recipe:   fromRecipeDataModel(mongo.Properties.Recipe),
+		c := &RecipeMongoDatabaseProperties{}
+		fmt.Println(c)
+		props := &RecipeMongoDatabaseProperties{
+			Mode: &mode,
+			//Recipe:   fromRecipeDataModel(mongo.Properties.Recipe),
 			Host:     to.Ptr(mongo.Properties.Host),
 			Port:     to.Ptr(mongo.Properties.Port),
 			Database: to.Ptr(mongo.Properties.Database),
@@ -152,6 +155,10 @@ func (dst *MongoDatabaseResource) ConvertFrom(src v1.DataModelInterface) error {
 			Environment:       to.Ptr(mongo.Properties.Environment),
 			Application:       to.Ptr(mongo.Properties.Application),
 		}
+		if !reflect.DeepEqual(mongo.Properties.Recipe, linkrp.LinkRecipe{}) {
+			props.Recipe = fromRecipeDataModel(mongo.Properties.Recipe)
+		}
+		dst.Properties = props
 	default:
 		return fmt.Errorf("Unsupported mode %s", mongo.Properties.Mode)
 	}
