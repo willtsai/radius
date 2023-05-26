@@ -24,6 +24,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/project-radius/radius/pkg/cli"
 	"github.com/project-radius/radius/pkg/cli/clients"
+	"github.com/project-radius/radius/pkg/cli/cmd/commonflags"
 	"github.com/project-radius/radius/pkg/cli/connections"
 	"github.com/project-radius/radius/pkg/cli/framework"
 	"github.com/project-radius/radius/pkg/cli/output"
@@ -121,8 +122,10 @@ func Test_Show(t *testing.T) {
 			ConnectionFactory: &connections.MockFactory{ApplicationsManagementClient: appManagementClient},
 			Workspace:         workspace,
 			Output:            outputSink,
-			ApplicationName:   "test-app",
-			Confirm:           true,
+			WorkspaceOptions: commonflags.WorkspaceOptions{
+				Application: "test-app",
+			},
+			Confirm: true,
 		}
 
 		err := runner.Run(context.Background())
@@ -168,7 +171,9 @@ func Test_Show(t *testing.T) {
 			InputPrompter:     promptMock,
 			Workspace:         workspace,
 			Output:            outputSink,
-			ApplicationName:   "test-app",
+			WorkspaceOptions: commonflags.WorkspaceOptions{
+				Application: "test-app",
+			},
 		}
 
 		err := runner.Run(context.Background())
@@ -204,10 +209,12 @@ func Test_Show(t *testing.T) {
 
 		outputSink := &output.MockOutput{}
 		runner := &Runner{
-			InputPrompter:   promptMock,
-			Workspace:       workspace,
-			Output:          outputSink,
-			ApplicationName: "test-app",
+			InputPrompter: promptMock,
+			Workspace:     workspace,
+			Output:        outputSink,
+			WorkspaceOptions: commonflags.WorkspaceOptions{
+				Application: "test-app",
+			},
 		}
 
 		err := runner.Run(context.Background())
@@ -242,8 +249,10 @@ func Test_Show(t *testing.T) {
 			ConnectionFactory: &connections.MockFactory{ApplicationsManagementClient: appManagementClient},
 			Workspace:         workspace,
 			Output:            outputSink,
-			ApplicationName:   "test-app",
-			Confirm:           true,
+			WorkspaceOptions: commonflags.WorkspaceOptions{
+				Application: "test-app",
+			},
+			Confirm: true,
 		}
 
 		err := runner.Run(context.Background())
@@ -281,10 +290,12 @@ func Test_Show(t *testing.T) {
 
 		outputSink := &output.MockOutput{}
 		runner := &Runner{
-			InputPrompter:   promptMock,
-			Output:          outputSink,
-			Workspace:       workspace,
-			ApplicationName: "test-app",
+			InputPrompter: promptMock,
+			Output:        outputSink,
+			Workspace:     workspace,
+			WorkspaceOptions: commonflags.WorkspaceOptions{
+				Application: "test-app",
+			},
 		}
 
 		err := runner.Run(context.Background())

@@ -47,7 +47,7 @@ rad env list
 
 	commonflags.AddWorkspaceFlag(cmd)
 	commonflags.AddResourceGroupFlag(cmd)
-	commonflags.AddOutputFlag(cmd)
+	commonflags.AddOutputFlagVar(cmd, &runner.Format)
 
 	return cmd, runner
 }
@@ -85,13 +85,6 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	r.Workspace.Scope = scope
-
-	format, err := cli.RequireOutput(cmd)
-	if err != nil {
-		return err
-	}
-
-	r.Format = format
 
 	return nil
 }

@@ -45,18 +45,19 @@ rad workspace show my-workspace`,
 		RunE: framework.RunCommand(runner),
 	}
 
-	commonflags.AddWorkspaceFlag(cmd)
-	commonflags.AddOutputFlag(cmd)
+	commonflags.AddWorkspaceNameFlagVar(cmd, &runner.WorkspaceOptions.Workspace)
+	commonflags.AddOutputFlagVar(cmd, &runner.Format)
 
 	return cmd, runner
 }
 
 // Runner is the runner implementation for the `rad workspace show` command.
 type Runner struct {
-	ConfigHolder *framework.ConfigHolder
-	Output       output.Interface
-	Format       string
-	Workspace    *workspaces.Workspace
+	ConfigHolder     *framework.ConfigHolder
+	Output           output.Interface
+	Format           string
+	WorkspaceOptions commonflags.WorkspaceOptions
+	Workspace        *workspaces.Workspace
 }
 
 // NewRunner creates a new instance of the `rad workspace show` runner.
@@ -69,22 +70,19 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad workspace show` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	workspace, err := cli.RequireWorkspaceArgs(cmd, r.ConfigHolder.Config, args)
+	err := commonflags.AcceptWorkspaceNamePositionalArg(cmd, args, &r.WorkspaceOptions.Workspace)
 	if err != nil {
 		return err
 	}
 
-	if !workspace.IsNamedWorkspace() {
+	r.Workspace, err = cli.LoadWorkspace(r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig, r.WorkspaceOptions, cli.RequiresWorkspace)
+	if err != nil {
+		return err
+	}
+
+	if !r.Workspace.IsNamedWorkspace() {
 		return workspaces.ErrEditableWorkspaceRequired
 	}
-
-	format, err := cli.RequireOutput(cmd)
-	if err != nil {
-		return err
-	}
-
-	r.Workspace = workspace
-	r.Format = format
 
 	return nil
 }

@@ -49,7 +49,7 @@ func NewCommand(factory framework.Factory) (*cobra.Command, framework.Runner) {
 	}
 
 	commonflags.AddWorkspaceFlag(cmd)
-	commonflags.AddOutputFlag(cmd)
+	commonflags.AddOutputFlagVar(cmd, &runner.Format)
 
 	return cmd, runner
 }

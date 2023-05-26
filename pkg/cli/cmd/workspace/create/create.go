@@ -56,25 +56,30 @@ rad workspace create kubernetes`,
 		RunE: framework.RunCommand(runner),
 	}
 
-	commonflags.AddWorkspaceFlag(cmd)
-	commonflags.AddResourceGroupFlag(cmd)
-	commonflags.AddEnvironmentNameFlag(cmd)
-	cmd.Flags().BoolP("force", "f", false, "Overwrite existing workspace if present")
-	cmd.Flags().StringP("context", "c", "", "the Kubernetes context to use, will use the default if unset")
+	commonflags.AddWorkspaceNameFlagVar(cmd, &runner.WorkspaceName)
+	commonflags.AddResourceGroupFlagVar(cmd, &runner.ResourceGroup)
+	commonflags.AddEnvironmentNameFlagVar(cmd, &runner.EnvironmentName)
+	commonflags.AddContextFlagVar(cmd, &runner.Context)
+	commonflags.AddForceFlagVar(cmd, &runner.Force)
 
 	return cmd, runner
 }
 
 // Runner is the runner implementation for the `rad workspace create` command.
 type Runner struct {
+	ConfigFileInterface framework.ConfigFileInterface
 	ConfigHolder        *framework.ConfigHolder
 	ConnectionFactory   connections.Factory
-	Workspace           *workspaces.Workspace
-	Force               bool
-	ConfigFileInterface framework.ConfigFileInterface
-	Output              output.Interface
 	HelmInterface       helm.Interface
 	KubernetesInterface kubernetes.Interface
+	Output              output.Interface
+
+	Context         string
+	EnvironmentName string
+	Force           bool
+	ResourceGroup   string
+	WorkspaceName   string
+	Workspace       *workspaces.Workspace
 }
 
 // NewRunner creates a new instance of the `rad workspace create` runner.
@@ -91,9 +96,8 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad workspace create` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	config := r.ConfigHolder.Config
-
-	workspaceName, err := cli.ReadWorkspaceNameSecondArg(cmd, args)
+	// Read the second arg, as 'kubernetes' is the first arg.
+	err := commonflags.AcceptWorkspaceNamePositionalArg(cmd, args[1:], &r.WorkspaceName)
 	if err != nil {
 		return err
 	}
@@ -102,7 +106,12 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return &cli.FriendlyError{Message: "Failed to read kube config"}
 	}
-	context, err := cli.RequireKubeContext(cmd, kubeContextList.CurrentContext)
+
+	if r.Context == "" {
+		r.Context = kubeContextList.CurrentContext
+	}
+
+	context, err := cli.RequireKubeContext(cmd, r.Context)
 	if err != nil {
 		return err
 	}
@@ -112,78 +121,63 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("the kubeconfig does not contain a context called %q", context)
 	}
 
-	if workspaceName == "" {
-		workspaceName = context
+	if r.WorkspaceName == "" {
+		r.WorkspaceName = context
 	}
 
 	state, err := r.HelmInterface.CheckRadiusInstall(context)
 	if !state.Installed || err != nil {
-		return fmt.Errorf("unable to create workspace %q. Radius control plane not installed on target platform. Run 'rad install' and try again", workspaceName)
+		return fmt.Errorf("unable to create workspace %q. Radius control plane not installed on target platform. Run 'rad install' and try again", r.WorkspaceName)
 	}
 
-	workspaceExists, err := cli.HasWorkspace(config, workspaceName)
+	workspaceExists, err := cli.HasWorkspace(r.ConfigHolder.Config, r.WorkspaceName)
 	if err != nil {
 		return err
 	}
 
-	force, err := cmd.Flags().GetBool("force")
-	if err != nil {
-		return err
-	}
-
-	if !force && workspaceExists {
+	if !r.Force && workspaceExists {
 		return fmt.Errorf("workspace exists. please specify --force to overwrite")
 	}
 
 	if workspaceExists {
-		workspace, err := cli.GetWorkspace(config, workspaceName)
+		workspace, err := cli.GetWorkspace(r.ConfigHolder.Config, r.WorkspaceName)
 		if err != nil {
 			return err
 		}
 		r.Workspace = workspace
 	} else {
-		r.Workspace = &workspaces.Workspace{}
-		r.Workspace.Name = workspaceName
+		r.Workspace = &workspaces.Workspace{Name: r.WorkspaceName}
 	}
 	r.Workspace.Connection = map[string]any{}
 	r.Workspace.Connection["context"] = context
 	r.Workspace.Connection["kind"] = args[0]
 
-	group, err := cmd.Flags().GetString("group")
-	if err != nil {
-		return err
-	}
-
-	env, err := cmd.Flags().GetString("environment")
-	if err != nil {
-		return err
-	}
-
 	var client clients.ApplicationsManagementClient
-	if group != "" {
-		r.Workspace.Scope = "/planes/radius/local/resourceGroups/" + group
+	if r.ResourceGroup != "" {
+		r.Workspace.Scope = "/planes/radius/local/resourceGroups/" + r.ResourceGroup
 
 		client, err = r.ConnectionFactory.CreateApplicationsManagementClient(cmd.Context(), *r.Workspace)
 		if err != nil {
 			return err
 		}
-		_, err := client.ShowUCPGroup(cmd.Context(), "radius", "local", group)
+		_, err := client.ShowUCPGroup(cmd.Context(), "radius", "local", r.ResourceGroup)
 		if err != nil {
 			return &cli.FriendlyError{Message: fmt.Sprintf("group %q does not exist. Run `rad env create` try again \n", r.Workspace.Scope)}
 		}
 
 		//we want to make sure we dont have a workspace which has environment in a different scope from workspace's scope
-		if r.Workspace.Environment != "" && !strings.HasPrefix(r.Workspace.Environment, r.Workspace.Scope) && env == "" {
+		if r.Workspace.Environment != "" && !strings.HasPrefix(r.Workspace.Environment, r.Workspace.Scope) && r.EnvironmentName == "" {
 			return fmt.Errorf("workspace is currently using an environment which is in different scope. use -e to specify an environment which is in the scope of this workspace")
 		}
 	}
-	if env != "" {
+
+	if r.EnvironmentName != "" {
 		if r.Workspace.Scope == "" {
 			return fmt.Errorf("cannot set environment for workspace with empty scope. use -g to set a scope")
 		}
-		r.Workspace.Environment = r.Workspace.Scope + "/providers/applications.core/environments/" + env
+		r.Workspace.Environment = r.Workspace.Scope + "/providers/applications.core/environments/" + r.EnvironmentName
 
-		_, err = client.GetEnvDetails(cmd.Context(), env)
+		_, err = client.GetEnvDetails(cmd.Context(), r.EnvironmentName)
 		if err != nil {
 			return &cli.FriendlyError{Message: fmt.Sprintf("environment %q does not exist. Run `rad env create` try again \n", r.Workspace.Environment)}
 		}

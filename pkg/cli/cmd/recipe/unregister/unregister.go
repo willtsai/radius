@@ -24,6 +24,7 @@ import (
 	"github.com/project-radius/radius/pkg/cli"
 	"github.com/project-radius/radius/pkg/cli/cmd"
 	"github.com/project-radius/radius/pkg/cli/cmd/commonflags"
+	"github.com/project-radius/radius/pkg/cli/cmd/recipe/common"
 	"github.com/project-radius/radius/pkg/cli/connections"
 	"github.com/project-radius/radius/pkg/cli/framework"
 	"github.com/project-radius/radius/pkg/cli/output"
@@ -44,12 +45,10 @@ func NewCommand(factory framework.Factory) (*cobra.Command, framework.Runner) {
 		RunE:    framework.RunCommand(runner),
 	}
 
-	commonflags.AddOutputFlag(cmd)
 	commonflags.AddWorkspaceFlag(cmd)
 	commonflags.AddResourceGroupFlag(cmd)
 	commonflags.AddEnvironmentNameFlag(cmd)
-	commonflags.AddLinkTypeFlag(cmd)
-	_ = cmd.MarkFlagRequired(cli.LinkTypeFlag)
+	common.AddLinkTypeRequiredFlagVar(cmd, &runner.LinkType)
 
 	return cmd, runner
 }
@@ -75,7 +74,8 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad recipe unregister` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	// Validate command line args
+	r.RecipeName = args[0]
+
 	workspace, err := cli.RequireWorkspace(cmd, r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig)
 	if err != nil {
 		return err
@@ -87,18 +87,6 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	r.Workspace.Environment = environment
-
-	recipeName, err := cli.RequireRecipeNameArgs(cmd, args)
-	if err != nil {
-		return err
-	}
-	r.RecipeName = recipeName
-
-	linkType, err := cli.RequireLinkType(cmd)
-	if err != nil {
-		return err
-	}
-	r.LinkType = linkType
 
 	return nil
 }

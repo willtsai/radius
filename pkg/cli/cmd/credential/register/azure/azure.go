@@ -63,16 +63,16 @@ rad credential register azure --client-id <client id/app id> --client-secret <cl
 		RunE: framework.RunCommand(runner),
 	}
 
-	commonflags.AddOutputFlag(cmd)
+	commonflags.AddOutputFlagVar(cmd, &runner.Format)
 	commonflags.AddWorkspaceFlag(cmd)
 
-	cmd.Flags().String("client-id", "", "The client id or app id of an Azure service principal.")
+	cmd.Flags().StringVar(&runner.ClientID, "client-id", "", "The client id or app id of an Azure service principal.")
 	_ = cmd.MarkFlagRequired("client-id")
 
-	cmd.Flags().String("client-secret", "", "The client secret or password of an Azure service principal.")
+	cmd.Flags().StringVar(&runner.ClientSecret, "client-secret", "", "The client secret or password of an Azure service principal.")
 	_ = cmd.MarkFlagRequired("client-secret")
 
-	cmd.Flags().String("tenant-id", "", "The tenant id of an Azure service principal.")
+	cmd.Flags().StringVar(&runner.TenantID, "tenant-id", "", "The tenant id of an Azure service principal.")
 	_ = cmd.MarkFlagRequired("tenant-id")
 
 	return cmd, runner
@@ -108,29 +108,6 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	r.Workspace = workspace
-
-	format, err := cli.RequireOutput(cmd)
-	if err != nil {
-		return err
-	}
-	r.Format = format
-
-	clientID, err := cmd.Flags().GetString("client-id")
-	if err != nil {
-		return err
-	}
-	clientSecret, err := cmd.Flags().GetString("client-secret")
-	if err != nil {
-		return err
-	}
-	tenantID, err := cmd.Flags().GetString("tenant-id")
-	if err != nil {
-		return err
-	}
-
-	r.ClientID = clientID
-	r.ClientSecret = clientSecret
-	r.TenantID = tenantID
 
 	kubeContext, ok := r.Workspace.KubernetesContext()
 	if !ok {

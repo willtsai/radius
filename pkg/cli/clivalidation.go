@@ -19,9 +19,9 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"path"
 	"strings"
 
+	"github.com/project-radius/radius/pkg/cli/cmd/commonflags"
 	"github.com/project-radius/radius/pkg/cli/config"
 	"github.com/project-radius/radius/pkg/cli/ucp"
 	"github.com/project-radius/radius/pkg/cli/workspaces"
@@ -30,16 +30,21 @@ import (
 	"github.com/spf13/viper"
 )
 
+type RequiredScope int
+
+const (
+	RequiresWorkspace     RequiredScope = 0x00000000
+	RequiresResourceGroup RequiredScope = 0x00000001
+	RequiresEnvironment   RequiredScope = 0x00000011
+	RequiresApplication   RequiredScope = 0x00000111
+)
+
 type AzureResource struct {
 	Name           string
 	ResourceType   string
 	ResourceGroup  string
 	SubscriptionID string
 }
-
-const (
-	LinkTypeFlag = "link-type"
-)
 
 func RequireEnvironmentNameArgs(cmd *cobra.Command, args []string, workspace workspaces.Workspace) (string, error) {
 	environmentName, err := ReadEnvironmentNameArgs(cmd, args)
@@ -217,7 +222,7 @@ func RequireResource(cmd *cobra.Command, args []string) (resourceType string, re
 
 func RequireResourceTypeAndName(args []string) (string, string, error) {
 	if len(args) < 2 {
-		return "", "", errors.New("No resource type or name provided")
+		return "", "", errors.New("no resource type or name provided")
 	}
 	resourceType, err := RequireResourceType(args)
 	if err != nil {
@@ -243,23 +248,6 @@ func RequireResourceType(args []string) (string, error) {
 	}
 	return "", fmt.Errorf("'%s' is not a valid resource type. Available Types are: \n\n%s\n",
 		resourceTypeName, strings.Join(supportedTypes, "\n"))
-}
-
-func RequireAzureResource(cmd *cobra.Command, args []string) (azureResource AzureResource, err error) {
-	results, err := requiredMultiple(cmd, args, "type", "resource", "resource-group", "resource-subscription-id")
-	if err != nil {
-		return AzureResource{}, err
-	}
-	return AzureResource{
-		ResourceType:   results[0],
-		Name:           results[1],
-		ResourceGroup:  results[2],
-		SubscriptionID: results[3],
-	}, nil
-}
-
-func RequireOutput(cmd *cobra.Command) (string, error) {
-	return cmd.Flags().GetString("output")
 }
 
 // RequireWorkspace is used by commands that require an existing workspace either set as the default,
@@ -323,80 +311,6 @@ func ReadResourceGroupNameArgs(cmd *cobra.Command, args []string) (string, error
 	return name, err
 }
 
-// RequireWorkspaceArgs is used by commands that require an existing workspace either set as the default,
-// or specified as a positional arg, or specified using the 'workspace' flag.
-func RequireWorkspaceArgs(cmd *cobra.Command, config *viper.Viper, args []string) (*workspaces.Workspace, error) {
-	name, err := ReadWorkspaceNameArgs(cmd, args)
-	if err != nil {
-		return nil, err
-	}
-
-	section, err := ReadWorkspaceSection(config)
-	if err != nil {
-		return nil, err
-	}
-
-	ws, err := section.GetWorkspace(name)
-	if err != nil {
-		return nil, err
-	}
-
-	// If we get here and ws is nil then this means there's no default set (or no config).
-	// Lets use the fallback configuration.
-	if ws == nil {
-		ws = workspaces.MakeFallbackWorkspace()
-	}
-
-	return ws, nil
-}
-
-// ReadWorkspaceNameArgs is used to get the workspace name that is supplied as either the first argument or using a -w flag
-func ReadWorkspaceNameArgs(cmd *cobra.Command, args []string) (string, error) {
-	name, err := cmd.Flags().GetString("workspace")
-	if err != nil {
-		return "", err
-	}
-
-	if len(args) > 0 {
-		if name != "" {
-			return "", fmt.Errorf("cannot specify workspace name via both arguments and `-w`")
-		}
-		name = args[0]
-	}
-
-	return name, err
-}
-
-// ReadWorkspaceName is used to get the workspace name that is supplied using a -w flag or as second arg.
-func ReadWorkspaceNameSecondArg(cmd *cobra.Command, args []string) (string, error) {
-	name, err := cmd.Flags().GetString("workspace")
-	if err != nil {
-		return "", err
-	}
-
-	if len(args) > 1 {
-		if name != "" {
-			return "", fmt.Errorf("cannot specify workspace name via both arguments and `-w`")
-		}
-		name = args[1]
-	}
-
-	return name, err
-}
-
-func RequireRadYAML(cmd *cobra.Command) (string, error) {
-	radFile, err := cmd.Flags().GetString("radfile")
-	if err != nil {
-		return "", err
-	}
-
-	if radFile == "" {
-		return path.Join(".", "rad.yaml"), nil
-	}
-
-	return radFile, nil
-}
-
 func requiredMultiple(cmd *cobra.Command, args []string, names ...string) ([]string, error) {
 	results := make([]string, len(names))
 	for i, name := range names {
@@ -435,22 +349,70 @@ func RequireScope(cmd *cobra.Command, workspace workspaces.Workspace) (string, e
 		return fmt.Sprintf("/planes/radius/local/resourceGroups/%s", resourceGroup), nil
 	} else if workspace.Scope != "" {
 		return workspace.Scope, nil
+	} else if workspace.IsEditableWorkspace() {
+		return "", &FriendlyError{Message: "no resource group set, either use `rad group switch` to set, or use `--group` to pass in a resource group name"}
 	} else {
 		return "", &FriendlyError{Message: "no resource group set, use `--group` to pass in a resource group name"}
 	}
 }
 
-func RequireRecipeNameArgs(cmd *cobra.Command, args []string) (string, error) {
-	if len(args) < 1 {
-		return "", errors.New("no recipe name provided")
-	}
-	return args[0], nil
-}
-
-func RequireLinkType(cmd *cobra.Command) (string, error) {
-	linkType, err := cmd.Flags().GetString(LinkTypeFlag)
+func LoadWorkspace(config *viper.Viper, dc *config.DirectoryConfig, options commonflags.WorkspaceOptions, requires RequiredScope) (*workspaces.Workspace, error) {
+	section, err := ReadWorkspaceSection(config)
 	if err != nil {
-		return linkType, err
+		return nil, err
 	}
-	return linkType, nil
+
+	// Load workspace based on command line options.
+	ws, err := section.GetWorkspace(options.Workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	// If we get here and ws is nil then this means there's no default set (or no config).
+	// Lets use the fallback configuration.
+	if ws == nil {
+		ws = workspaces.MakeFallbackWorkspace()
+	}
+
+	if dc != nil {
+		ws.DirectoryConfig = *dc
+	}
+
+	if requires == RequiresWorkspace {
+		return ws, nil
+	}
+
+	if options.ResourceGroup != "" {
+		ws.Scope = fmt.Sprintf("/planes/radius/local/resourceGroups/%s", options.ResourceGroup)
+	} else if ws.Scope == "" && ws.IsEditableWorkspace() {
+		return nil, &FriendlyError{Message: "no resource group name provided and no default resource group name set, " +
+			"either use `--group` to provide a resource group name or set a default resource group name using `rad group switch`"}
+	} else if ws.Scope == "" {
+		return nil, &FriendlyError{Message: "no resource group set, use `--group` to provide in a resource group name"}
+	}
+
+	if requires == RequiresResourceGroup {
+		return ws, nil
+	}
+
+	if options.Environment != "" {
+		ws.Environment = fmt.Sprintf("%s/providers/Applications.Core/environments/%s", ws.Scope, options.Environment)
+	} else if ws.Environment == "" && ws.IsEditableWorkspace() {
+		return nil, &FriendlyError{Message: "no environment name provided and no default environment set, " +
+			"either use `--environment` to provide an environment name or set a default environment by using `rad env switch`"}
+	} else if ws.Environment == "" {
+		return nil, &FriendlyError{Message: "no environment set, use `--environment` to provide an environment name"}
+	}
+
+	if requires == RequiresEnvironment {
+		return ws, nil
+	}
+
+	if options.Application != "" {
+		ws.DefaultApplication = fmt.Sprintf("%s/providers/Applications.Core/applications/%s", ws.Scope, options.Application)
+	} else if ws.DefaultApplication == "" {
+		return nil, &FriendlyError{Message: "no application name provided, use `--application` to provide an application name"}
+	}
+
+	return ws, nil
 }

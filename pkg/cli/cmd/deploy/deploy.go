@@ -101,7 +101,7 @@ rad deploy myapp.bicep --parameters @myfile.json --parameters version=latest
 	commonflags.AddResourceGroupFlag(cmd)
 	commonflags.AddEnvironmentNameFlag(cmd)
 	commonflags.AddApplicationNameFlag(cmd)
-	commonflags.AddParameterFlag(cmd)
+	commonflags.AddBicepParametersFlagVar(cmd, &runner.ParametersRaw)
 
 	return cmd, runner
 }
@@ -117,6 +117,7 @@ type Runner struct {
 	ApplicationName string
 	EnvironmentName string
 	FilePath        string
+	ParametersRaw   []string
 	Parameters      map[string]map[string]any
 	Workspace       *workspaces.Workspace
 	Providers       *clients.Providers

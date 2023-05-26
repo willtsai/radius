@@ -61,7 +61,7 @@ func NewCommand(factory framework.Factory) (*cobra.Command, framework.Runner) {
 	}
 
 	// Define your flags here
-	commonflags.AddOutputFlag(cmd)
+	commonflags.AddOutputFlagVar(cmd, &runner.Format)
 	cmd.Flags().StringP("flagName", "k (flag's shorthand notation like w for workspace)", "", "What does the flag ask for")
 
 	return cmd, runner

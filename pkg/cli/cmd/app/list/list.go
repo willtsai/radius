@@ -48,9 +48,8 @@ rad app list --group my-group
 		RunE: framework.RunCommand(runner),
 	}
 
-	commonflags.AddWorkspaceFlag(cmd)
-	commonflags.AddResourceGroupFlag(cmd)
-	commonflags.AddOutputFlag(cmd)
+	commonflags.AddResourceGroupScopedOptionsVar(cmd, &runner.WorkspaceOptions)
+	commonflags.AddOutputFlagVar(cmd, &runner.Format)
 
 	return cmd, runner
 }
@@ -62,7 +61,8 @@ type Runner struct {
 	Workspace         *workspaces.Workspace
 	Output            output.Interface
 
-	Format string
+	Format           string
+	WorkspaceOptions commonflags.WorkspaceOptions
 }
 
 // NewRunner creates an instance of the runner for the `rad app list` command.
@@ -76,25 +76,11 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad app list` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	workspace, err := cli.RequireWorkspace(cmd, r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig)
+	workspace, err := cli.LoadWorkspace(r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig, r.WorkspaceOptions, cli.RequiresResourceGroup)
 	if err != nil {
 		return err
 	}
 	r.Workspace = workspace
-
-	// Allow '--group' to override scope
-	scope, err := cli.RequireScope(cmd, *r.Workspace)
-	if err != nil {
-		return err
-	}
-	r.Workspace.Scope = scope
-
-	format, err := cli.RequireOutput(cmd)
-	if err != nil {
-		return err
-	}
-
-	r.Format = format
 
 	return nil
 }

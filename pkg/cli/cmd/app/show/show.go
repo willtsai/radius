@@ -53,10 +53,8 @@ rad app show my-app --group my-group
 		RunE: framework.RunCommand(runner),
 	}
 
-	commonflags.AddWorkspaceFlag(cmd)
-	commonflags.AddResourceGroupFlag(cmd)
-	commonflags.AddApplicationNameFlag(cmd)
-	commonflags.AddOutputFlag(cmd)
+	commonflags.AddApplicationScopedOptionsVar(cmd, &runner.WorkspaceOptions)
+	commonflags.AddOutputFlagVar(cmd, &runner.Format)
 
 	return cmd, runner
 }
@@ -68,8 +66,8 @@ type Runner struct {
 	Workspace         *workspaces.Workspace
 	Output            output.Interface
 
-	ApplicationName string
-	Format          string
+	Format           string
+	WorkspaceOptions commonflags.WorkspaceOptions
 }
 
 // NewRunner creates an instance of the runner for the `rad app show` command.
@@ -83,30 +81,15 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad app show` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	workspace, err := cli.RequireWorkspace(cmd, r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig)
-	if err != nil {
-		return err
-	}
-	r.Workspace = workspace
-
-	// Allow '--group' to override scope
-	scope, err := cli.RequireScope(cmd, *r.Workspace)
-	if err != nil {
-		return err
-	}
-	r.Workspace.Scope = scope
-
-	r.ApplicationName, err = cli.RequireApplicationArgs(cmd, args, *workspace)
+	err := commonflags.AcceptApplicationNamePositionalArg(cmd, args, &r.WorkspaceOptions.Application)
 	if err != nil {
 		return err
 	}
 
-	format, err := cli.RequireOutput(cmd)
+	r.Workspace, err = cli.LoadWorkspace(r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig, r.WorkspaceOptions, cli.RequiresApplication)
 	if err != nil {
 		return err
 	}
-
-	r.Format = format
 
 	return nil
 }
@@ -118,9 +101,9 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
-	application, err := client.ShowApplication(ctx, r.ApplicationName)
+	application, err := client.ShowApplication(ctx, r.WorkspaceOptions.Application)
 	if clients.Is404Error(err) {
-		return &cli.FriendlyError{Message: fmt.Sprintf("The application %q was not found or has been deleted.", r.ApplicationName)}
+		return &cli.FriendlyError{Message: fmt.Sprintf("The application %q was not found or has been deleted.", r.WorkspaceOptions.Application)}
 	} else if err != nil {
 		return err
 	}

@@ -51,7 +51,7 @@ rad credential show aws
 		RunE: framework.RunCommand(runner),
 	}
 
-	commonflags.AddOutputFlag(cmd)
+	commonflags.AddOutputFlagVar(cmd, &runner.Format)
 	commonflags.AddWorkspaceFlag(cmd)
 
 	return cmd, runner
@@ -83,12 +83,6 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	r.Workspace = workspace
-
-	format, err := cli.RequireOutput(cmd)
-	if err != nil {
-		return err
-	}
-	r.Format = format
 
 	r.Kind = args[0] // Validated by Cobra
 	err = common.ValidateCloudProviderName(r.Kind)

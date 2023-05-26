@@ -56,7 +56,7 @@ func NewCommand(factory framework.Factory) (*cobra.Command, framework.Runner) {
 		RunE: framework.RunCommand(runner),
 	}
 
-	commonflags.AddOutputFlag(cmd)
+	commonflags.AddOutputFlagVar(cmd, &runner.Format)
 	commonflags.AddWorkspaceFlag(cmd)
 	commonflags.AddResourceGroupFlag(cmd)
 
@@ -103,12 +103,6 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 	}
 	r.ResourceType = resourceType
 	r.ResourceName = resourceName
-
-	format, err := cli.RequireOutput(cmd)
-	if err != nil {
-		return err
-	}
-	r.Format = format
 
 	return nil
 }

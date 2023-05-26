@@ -60,10 +60,8 @@ rad app delete my-app --group my-group
 		RunE: framework.RunCommand(runner),
 	}
 
-	commonflags.AddWorkspaceFlag(cmd)
-	commonflags.AddResourceGroupFlag(cmd)
-	commonflags.AddApplicationNameFlag(cmd)
-	commonflags.AddConfirmationFlag(cmd)
+	commonflags.AddApplicationScopedOptionsVar(cmd, &runner.WorkspaceOptions)
+	commonflags.AddConfirmationFlagVar(cmd, &runner.Confirm)
 
 	return cmd, runner
 }
@@ -75,10 +73,9 @@ type Runner struct {
 	InputPrompter     prompt.Interface
 	Output            output.Interface
 
-	ApplicationName string
-	Scope           string
-	Confirm         bool
-	Workspace       *workspaces.Workspace
+	Confirm          bool
+	WorkspaceOptions commonflags.WorkspaceOptions
+	Workspace        *workspaces.Workspace
 }
 
 // NewRunner creates an instance of the runner for the `rad app delete` command.
@@ -93,25 +90,12 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad app delete` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	workspace, err := cli.RequireWorkspace(cmd, r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig)
-	if err != nil {
-		return err
-	}
-	r.Workspace = workspace
-
-	// Allow '--group' to override scope
-	scope, err := cli.RequireScope(cmd, *r.Workspace)
-	if err != nil {
-		return err
-	}
-	r.Workspace.Scope = scope
-
-	r.ApplicationName, err = cli.RequireApplicationArgs(cmd, args, *workspace)
+	err := commonflags.AcceptApplicationNamePositionalArg(cmd, args, &r.WorkspaceOptions.Application)
 	if err != nil {
 		return err
 	}
 
-	r.Confirm, err = cmd.Flags().GetBool("yes")
+	r.Workspace, err = cli.LoadWorkspace(r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig, r.WorkspaceOptions, cli.RequiresApplication)
 	if err != nil {
 		return err
 	}
@@ -123,7 +107,7 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 func (r *Runner) Run(ctx context.Context) error {
 	// Prompt user to confirm deletion
 	if !r.Confirm {
-		confirmed, err := prompt.YesOrNoPrompt(fmt.Sprintf(deleteConfirmation, r.ApplicationName, r.Workspace.Name), prompt.ConfirmNo, r.InputPrompter)
+		confirmed, err := prompt.YesOrNoPrompt(fmt.Sprintf(deleteConfirmation, r.WorkspaceOptions.Application, r.Workspace.Name), prompt.ConfirmNo, r.InputPrompter)
 		if err != nil {
 			if errors.Is(err, &prompt.ErrExitConsole{}) {
 				return &cli.FriendlyError{Message: err.Error()}
@@ -140,7 +124,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
-	deleted, err := client.DeleteApplication(ctx, r.ApplicationName)
+	deleted, err := client.DeleteApplication(ctx, r.WorkspaceOptions.Application)
 	if err != nil {
 		return err
 	}
@@ -148,7 +132,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	if deleted {
 		r.Output.LogInfo("Application deleted")
 	} else {
-		r.Output.LogInfo("Application '%s' does not exist or has already been deleted.", r.ApplicationName)
+		r.Output.LogInfo("Application '%s' does not exist or has already been deleted.", r.WorkspaceOptions.Application)
 	}
 
 	return nil

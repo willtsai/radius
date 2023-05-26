@@ -87,10 +87,10 @@ func Test_Run(t *testing.T) {
 	defer ctrl.Finish()
 
 	environments := []v20220315privatepreview.EnvironmentResource{
-		v20220315privatepreview.EnvironmentResource{
+		{
 			Name: to.Ptr("A"),
 		},
-		v20220315privatepreview.EnvironmentResource{
+		{
 			Name: to.Ptr("B"),
 		},
 	}

@@ -54,8 +54,8 @@ Applications deployed to an environment will inherit the container runtime, conf
 
 	commonflags.AddEnvironmentNameFlag(cmd)
 	commonflags.AddWorkspaceFlag(cmd)
-	commonflags.AddResourceGroupFlag(cmd)
-	commonflags.AddNamespaceFlag(cmd)
+	commonflags.AddResourceGroupFlagVar(cmd, &runner.UCPResourceGroup)
+	commonflags.AddNamespaceFlagVar(cmd, &runner.Namespace)
 
 	return cmd, runner
 }
@@ -99,16 +99,8 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	r.Namespace, err = cmd.Flags().GetString("namespace")
-	if err != nil {
-		return err
-	} else if r.Namespace == "" {
+	if r.Namespace == "" {
 		r.Namespace = r.EnvironmentName
-	}
-
-	r.UCPResourceGroup, err = cmd.Flags().GetString("group")
-	if err != nil {
-		return err
 	}
 
 	if r.UCPResourceGroup == "" {

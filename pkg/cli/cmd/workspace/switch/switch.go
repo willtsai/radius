@@ -42,7 +42,7 @@ rad workspace switch my-workspace`,
 		RunE: framework.RunCommand(runner),
 	}
 
-	commonflags.AddWorkspaceFlag(cmd)
+	commonflags.AddWorkspaceNameFlagVar(cmd, &runner.WorkspaceName)
 
 	return cmd, runner
 }
@@ -66,27 +66,25 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad workspace switch` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	// We read the name explicitly rather than calling RequireWorkspace
-	// because we require a workspace to be specified. RequireWorkspace would
+	// We read the name explicitly rather than calling LoadWorkspace
+	// because we require a workspace to be specified. LoadWorkspace would
 	// apply our defaulting logic and miss some error cases.
-	workspaceName, err := cli.ReadWorkspaceNameArgs(cmd, args)
+	err := commonflags.AcceptWorkspaceNamePositionalArg(cmd, args, &r.WorkspaceName)
 	if err != nil {
 		return err
 	}
 
-	if workspaceName == "" {
+	if r.WorkspaceName == "" {
 		return workspaces.ErrNamedWorkspaceRequired
 	}
 
 	// We don't actually need the workspace, but we want to make sure it exists.
 	//
 	// So this is being called for the side-effect of running the validation.
-	_, err = cli.GetWorkspace(r.ConfigHolder.Config, workspaceName)
+	_, err = cli.GetWorkspace(r.ConfigHolder.Config, r.WorkspaceName)
 	if err != nil {
 		return err
 	}
-
-	r.WorkspaceName = workspaceName
 
 	return nil
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/project-radius/radius/pkg/cli"
 	"github.com/project-radius/radius/pkg/cli/bicep"
 	"github.com/project-radius/radius/pkg/cli/cmd/commonflags"
+	"github.com/project-radius/radius/pkg/cli/cmd/recipe/common"
 	"github.com/project-radius/radius/pkg/cli/connections"
 	"github.com/project-radius/radius/pkg/cli/framework"
 	"github.com/project-radius/radius/pkg/cli/output"
@@ -59,17 +60,15 @@ rad recipe register cosmosdb -e env_name -w workspace --template-kind bicep --te
 		RunE: framework.RunCommand(runner),
 	}
 
-	commonflags.AddOutputFlag(cmd)
 	commonflags.AddWorkspaceFlag(cmd)
 	commonflags.AddResourceGroupFlag(cmd)
 	commonflags.AddEnvironmentNameFlag(cmd)
-	cmd.Flags().String("template-kind", "", "specify the kind for the template provided by the recipe.")
+	cmd.Flags().StringVar(&runner.TemplateKind, "template-kind", "", "specify the kind for the template provided by the recipe.")
 	_ = cmd.MarkFlagRequired("template-kind")
-	cmd.Flags().String("template-path", "", "specify the path to the template provided by the recipe.")
+	cmd.Flags().StringVar(&runner.TemplatePath, "template-path", "", "specify the path to the template provided by the recipe.")
 	_ = cmd.MarkFlagRequired("template-path")
-	cmd.Flags().String("link-type", "", "specify the type of the link this recipe can be consumed by")
-	_ = cmd.MarkFlagRequired("link-type")
-	commonflags.AddParameterFlag(cmd)
+	common.AddLinkTypeRequiredFlagVar(cmd, &runner.LinkType)
+	commonflags.AddBicepParametersFlagVar(cmd, &runner.ParametersRaw)
 
 	return cmd, runner
 }
@@ -84,6 +83,7 @@ type Runner struct {
 	TemplatePath      string
 	LinkType          string
 	RecipeName        string
+	ParametersRaw     []string
 	Parameters        map[string]map[string]any
 }
 
@@ -98,7 +98,8 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad recipe register` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	// Validate command line args
+	r.RecipeName = args[0]
+
 	workspace, err := cli.RequireWorkspace(cmd, r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig)
 	if err != nil {
 		return err
@@ -111,32 +112,8 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 	}
 	r.Workspace.Environment = environment
 
-	templateKind, templatePath, err := requireRecipeProperties(cmd)
-	if err != nil {
-		return err
-	}
-	r.TemplateKind = templateKind
-	r.TemplatePath = templatePath
-
-	linkType, err := cli.RequireLinkType(cmd)
-	if err != nil {
-		return err
-	}
-	r.LinkType = linkType
-
-	recipeName, err := cli.RequireRecipeNameArgs(cmd, args)
-	if err != nil {
-		return err
-	}
-	r.RecipeName = recipeName
-
-	parameterArgs, err := cmd.Flags().GetStringArray("parameters")
-	if err != nil {
-		return err
-	}
-
 	parser := bicep.ParameterParser{FileSystem: bicep.OSFileSystem{}}
-	r.Parameters, err = parser.Parse(parameterArgs...)
+	r.Parameters, err = parser.Parse(r.ParametersRaw...)
 	if err != nil {
 		return err
 	}
@@ -182,18 +159,4 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	r.Output.LogInfo("Successfully linked recipe %q to environment %q ", r.RecipeName, r.Workspace.Environment)
 	return nil
-}
-
-func requireRecipeProperties(cmd *cobra.Command) (templateKind, templatePath string, err error) {
-	templateKind, err = cmd.Flags().GetString("template-kind")
-	if err != nil {
-		return "", "", err
-	}
-
-	templatePath, err = cmd.Flags().GetString("template-path")
-	if err != nil {
-		return "", "", err
-	}
-
-	return templateKind, templatePath, nil
 }

@@ -43,7 +43,7 @@ rad workspace list`,
 		RunE: framework.RunCommand(runner),
 	}
 
-	commonflags.AddOutputFlag(cmd)
+	commonflags.AddOutputFlagVar(cmd, &runner.Format)
 	return cmd, runner
 }
 
@@ -64,13 +64,6 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad workspace list` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	format, err := cli.RequireOutput(cmd)
-	if err != nil {
-		return err
-	}
-
-	r.Format = format
-
 	return nil
 }
 

@@ -24,6 +24,7 @@ import (
 	"github.com/project-radius/radius/pkg/cli"
 	"github.com/project-radius/radius/pkg/cli/clients"
 	"github.com/project-radius/radius/pkg/cli/clients_new/generated"
+	"github.com/project-radius/radius/pkg/cli/cmd/commonflags"
 	"github.com/project-radius/radius/pkg/cli/connections"
 	"github.com/project-radius/radius/pkg/cli/framework"
 	"github.com/project-radius/radius/pkg/cli/objectformats"
@@ -157,10 +158,12 @@ func Test_Run(t *testing.T) {
 				ApplicationsManagementClient: appManagementClient,
 				DiagnosticsClient:            diagnosticsClient,
 			},
-			Workspace:       workspace,
-			Format:          "table",
-			Output:          outputSink,
-			ApplicationName: "test-app",
+			Workspace: workspace,
+			Format:    "table",
+			Output:    outputSink,
+			WorkspaceOptions: commonflags.WorkspaceOptions{
+				Application: "test-app",
+			},
 		}
 
 		err := runner.Run(context.Background())
@@ -220,7 +223,9 @@ func Test_Run(t *testing.T) {
 			Workspace:         workspace,
 			Format:            "table",
 			Output:            outputSink,
-			ApplicationName:   "test-app",
+			WorkspaceOptions: commonflags.WorkspaceOptions{
+				Application: "test-app",
+			},
 		}
 
 		err := runner.Run(context.Background())

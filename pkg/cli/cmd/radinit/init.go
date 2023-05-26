@@ -60,8 +60,8 @@ func NewCommand(factory framework.Factory) (*cobra.Command, framework.Runner) {
 	}
 
 	// Define your flags here
-	commonflags.AddOutputFlag(cmd)
-	cmd.Flags().Bool("dev", false, "Setup Radius for development")
+	commonflags.AddOutputFlagVar(cmd, &runner.Format)
+	cmd.Flags().BoolVar(&runner.Dev, "dev", false, "Setup Radius for development")
 	return cmd, runner
 }
 
@@ -127,17 +127,6 @@ func NewRunner(factory framework.Factory) *Runner {
 //
 // Validates the user prompts, values provided and builds the picture for the backend to execute
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	format, err := cli.RequireOutput(cmd)
-	if err != nil {
-		return &cli.FriendlyError{Message: "Output format not specified"}
-	}
-	r.Format = format
-
-	r.Dev, err = cmd.Flags().GetBool("dev")
-	if err != nil {
-		return err
-	}
-
 	for {
 		options, workspace, err := r.enterInitOptions(cmd.Context())
 		if errors.Is(err, &prompt.ErrExitConsole{}) {

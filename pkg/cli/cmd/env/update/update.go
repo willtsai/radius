@@ -38,6 +38,20 @@ const (
 	envNotFoundErrMessage = "Environment does not exist. Please select a new environment and try again."
 	azureScopeTemplate    = "/subscriptions/%s/resourceGroups/%s"
 	awsScopeTemplate      = "/planes/aws/aws/accounts/%s/regions/%s"
+
+	// flagAWSAccountId provides aws accound id.
+	flagAWSAccountId = "aws-account-id"
+	// flagAWSRegion provides aws region.
+	flagAWSRegion = "aws-region"
+	// flagAWSClear tells the command to clear aws scope on the environment it is configured.
+	flagAWSClear = "clear-aws"
+
+	// flagAzureSubscriptionID provides azure subscription Id.
+	flagAzureSubscriptionID = "azure-subscription-id"
+	// flagAzureResourceGroup provides azure resource group.
+	flagAzureResourceGroup = "azure-resource-group"
+	// flagAzureClear tells the command to clear azure scope on the environment it is configured.
+	flagAzureClear = "clear-azure"
 )
 
 // NewCommand creates an instance of the command and runner for the `rad env update` command.
@@ -79,13 +93,23 @@ rad env update myenv --clear-aws
 
 	commonflags.AddWorkspaceFlag(cmd)
 	commonflags.AddResourceGroupFlag(cmd)
-	cmd.Flags().Bool(commonflags.ClearEnvAzureFlag, false, "Specify if azure provider needs to be cleared on env")
-	cmd.Flags().Bool(commonflags.ClearEnvAWSFlag, false, "Specify if aws provider needs to be cleared on env")
-	commonflags.AddAzureScopeFlags(cmd)
-	commonflags.AddAWSScopeFlags(cmd)
-	commonflags.AddOutputFlag(cmd)
-	//TODO: https://github.com/project-radius/radius/issues/5247
 	commonflags.AddEnvironmentNameFlag(cmd)
+
+	// Azure
+	cmd.Flags().BoolVar(&runner.clearEnvAzure, flagAzureClear, false, "Specify if azure provider needs to be cleared on env")
+	cmd.Flags().StringVar(&runner.azureSubscriptionID, flagAzureSubscriptionID, "", "The subscription id where Azure resources will be deployed")
+	cmd.Flags().StringVar(&runner.azureResourceGroup, flagAzureResourceGroup, "", "The resource group where Azure resources will be deployed")
+	cmd.MarkFlagsRequiredTogether(flagAzureSubscriptionID, flagAzureResourceGroup)
+	cmd.MarkFlagsMutuallyExclusive(flagAzureSubscriptionID, flagAzureClear)
+	cmd.MarkFlagsMutuallyExclusive(flagAzureResourceGroup, flagAzureClear)
+
+	// AWS
+	cmd.Flags().BoolVar(&runner.clearEnvAws, flagAWSClear, false, "Specify if aws provider needs to be cleared on env")
+	cmd.Flags().StringVar(&runner.awsAccountID, flagAWSAccountId, "", "The account ID where AWS resources will be deployed")
+	cmd.Flags().StringVar(&runner.awsRegion, flagAWSRegion, "", "The region where AWS resources will be deployed")
+	cmd.MarkFlagsRequiredTogether(flagAWSAccountId, flagAWSRegion)
+	cmd.MarkFlagsMutuallyExclusive(flagAWSRegion, flagAWSClear)
+	cmd.MarkFlagsMutuallyExclusive(flagAWSAccountId, flagAWSClear)
 
 	return cmd, runner
 }
@@ -97,11 +121,15 @@ type Runner struct {
 	Workspace         *workspaces.Workspace
 	Output            output.Interface
 
-	EnvName       string
-	clearEnvAzure bool
-	clearEnvAws   bool
-	providers     *corerp.Providers
-	noFlagsSet    bool
+	EnvName             string
+	clearEnvAzure       bool
+	clearEnvAws         bool
+	azureSubscriptionID string
+	azureResourceGroup  string
+	awsAccountID        string
+	awsRegion           string
+	providers           *corerp.Providers
+	noFlagsSet          bool
 }
 
 // NewRunner creates a new instance of the `rad env update` runner.
@@ -115,10 +143,6 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad env update` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	if cmd.Flags().NFlag() == 0 {
-		r.noFlagsSet = true
-		return cmd.Help()
-	}
 	workspace, err := cli.RequireWorkspace(cmd, r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig)
 	if err != nil {
 		return err
@@ -136,42 +160,12 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 	}
 
 	// TODO: Validate Azure scope components (https://github.com/project-radius/radius/issues/5155)
-	azureSubId, err := cmd.Flags().GetString(commonflags.AzureSubscriptionIdFlag)
-	if err != nil {
-		return err
+	if r.azureSubscriptionID != "" && r.azureResourceGroup != "" {
+		r.providers.Azure.Scope = to.Ptr(fmt.Sprintf(azureScopeTemplate, r.azureSubscriptionID, r.azureResourceGroup))
 	}
 
-	azureRgId, err := cmd.Flags().GetString(commonflags.AzureResourceGroupFlag)
-	if err != nil {
-		return err
-	}
-	if azureSubId != "" && azureRgId != "" {
-		r.providers.Azure.Scope = to.Ptr(fmt.Sprintf(azureScopeTemplate, azureSubId, azureRgId))
-	}
-
-	r.clearEnvAzure, err = cmd.Flags().GetBool(commonflags.ClearEnvAzureFlag)
-	if err != nil {
-		return err
-	}
-
-	// TODO: Validate AWS scope components (https://github.com/project-radius/radius/issues/5155)
-	// stsclient can be used to validate
-	awsRegion, err := cmd.Flags().GetString(commonflags.AWSRegionFlag)
-	if err != nil {
-		return err
-	}
-
-	awsAccountId, err := cmd.Flags().GetString(commonflags.AWSAccountIdFlag)
-	if err != nil {
-		return err
-	}
-	if awsRegion != "" && awsAccountId != "" {
-		r.providers.Aws.Scope = to.Ptr(fmt.Sprintf(awsScopeTemplate, awsAccountId, awsRegion))
-	}
-
-	r.clearEnvAws, err = cmd.Flags().GetBool(commonflags.ClearEnvAWSFlag)
-	if err != nil {
-		return err
+	if r.awsAccountID != "" && r.awsRegion != "" {
+		r.providers.Aws.Scope = to.Ptr(fmt.Sprintf(awsScopeTemplate, r.awsAccountID, r.awsRegion))
 	}
 
 	return nil

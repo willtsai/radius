@@ -43,8 +43,12 @@ func NewCommand(factory framework.Factory) (*cobra.Command, framework.Runner) {
 		RunE:    framework.RunCommand(runner),
 	}
 
-	commonflags.AddWorkspaceFlag(cmd)
-	commonflags.AddApplicationNameFlag(cmd)
+	// As a special case, we don't want to actually bind the application name
+	// to the workspace. We want to see what was previously saved in the workspace so we can compare them.
+	//
+	// That's why this uses AddResourceGroupScopedOptionsVar.
+	commonflags.AddResourceGroupScopedOptionsVar(cmd, &runner.WorkspaceOptions)
+	commonflags.AddApplicationNameFlagVar(cmd, &runner.ApplicationName)
 
 	return cmd, runner
 }
@@ -52,10 +56,12 @@ func NewCommand(factory framework.Factory) (*cobra.Command, framework.Runner) {
 // Runner is the runner implementation for the `rad app switch` command.
 type Runner struct {
 	ConfigHolder      *framework.ConfigHolder
-	Output            output.Interface
-	Workspace         *workspaces.Workspace
-	ApplicationName   string
 	ConnectionFactory connections.Factory
+	Output            output.Interface
+
+	ApplicationName  string
+	Workspace        *workspaces.Workspace
+	WorkspaceOptions commonflags.WorkspaceOptions
 }
 
 // NewRunner creates a new instance of the `rad app switch` runner.
@@ -69,23 +75,22 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad app switch` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	workspace, err := cli.RequireWorkspace(cmd, r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig)
+	err := commonflags.AcceptApplicationNamePositionalArg(cmd, args, &r.ApplicationName)
 	if err != nil {
 		return err
 	}
-	r.Workspace = workspace
+
+	r.Workspace, err = cli.LoadWorkspace(r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig, r.WorkspaceOptions, cli.RequiresResourceGroup)
+	if err != nil {
+		return err
+	}
 
 	if !r.Workspace.IsEditableWorkspace() {
 		// Only workspaces stored in configuration can be modified.
 		return workspaces.ErrEditableWorkspaceRequired
 	}
 
-	r.ApplicationName, err = cli.ReadApplicationNameArgs(cmd, args)
-	if err != nil {
-		return err
-	}
-
-	// Keep the logic below here in sync with `rad env switch``
+	// Keep the logic below here in sync with `rad env switch`
 	if strings.EqualFold(r.Workspace.DefaultApplication, r.ApplicationName) {
 		r.Output.LogInfo("Default application is already set to %v", r.ApplicationName)
 		return nil
@@ -104,17 +109,17 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if workspace.DefaultApplication == "" {
-		r.Output.LogInfo("Switching default application to %v", r.ApplicationName)
-	} else {
-		r.Output.LogInfo("Switching default application from %v to %v", workspace.DefaultApplication, r.ApplicationName)
-	}
-
 	return nil
 }
 
 // Run runs the `rad app switch` command.
 func (r *Runner) Run(ctx context.Context) error {
+	if r.Workspace.DefaultApplication == "" {
+		r.Output.LogInfo("Switching default application to %v", r.ApplicationName)
+	} else {
+		r.Output.LogInfo("Switching default application from %v to %v", r.Workspace.DefaultApplication, r.ApplicationName)
+	}
+
 	err := cli.EditWorkspaces(ctx, r.ConfigHolder.Config, func(section *cli.WorkspaceSection) error {
 		r.Workspace.DefaultApplication = r.ApplicationName
 		section.Items[strings.ToLower(r.Workspace.Name)] = *r.Workspace

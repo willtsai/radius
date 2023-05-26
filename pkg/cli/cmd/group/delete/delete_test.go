@@ -85,7 +85,7 @@ func Test_Run(t *testing.T) {
 				ConnectionFactory:    &connections.MockFactory{ApplicationsManagementClient: appManagementClient},
 				Workspace:            &workspaces.Workspace{},
 				UCPResourceGroupName: "testrg",
-				Confirmation:         true,
+				Confirm:              true,
 				Output:               outputSink,
 			}
 
@@ -117,7 +117,7 @@ func Test_Run(t *testing.T) {
 				ConnectionFactory:    &connections.MockFactory{ApplicationsManagementClient: appManagementClient},
 				Workspace:            &workspaces.Workspace{},
 				UCPResourceGroupName: "testrg",
-				Confirmation:         true,
+				Confirm:              true,
 				Output:               outputSink,
 			}
 
@@ -153,7 +153,7 @@ func Test_Run(t *testing.T) {
 				ConnectionFactory:    &connections.MockFactory{ApplicationsManagementClient: appManagementClient},
 				Workspace:            &workspaces.Workspace{},
 				UCPResourceGroupName: "testrg",
-				Confirmation:         false,
+				Confirm:              false,
 				InputPrompter:        prompter,
 				Output:               outputSink,
 			}
@@ -184,7 +184,7 @@ func Test_Run(t *testing.T) {
 
 		runner := &Runner{
 			UCPResourceGroupName: "testrg",
-			Confirmation:         false,
+			Confirm:              false,
 			InputPrompter:        prompter,
 			Output:               outputSink,
 		}

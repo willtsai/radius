@@ -62,9 +62,9 @@ rad bicep publish --file ./redis-test.bicep --target br:myregistry.azurecr.io/re
 		RunE: framework.RunCommand(runner),
 	}
 
-	cmd.Flags().String("file", "", "path to the local Bicep file, relative to the current working directory.")
+	cmd.Flags().StringVar(&runner.File, "file", "", "path to the local Bicep file, relative to the current working directory.")
 	_ = cmd.MarkFlagRequired("file")
-	cmd.Flags().String("target", "", "remote OCI registry path, in the format 'br:HOST/PATH:TAG'.")
+	cmd.Flags().StringVar(&runner.Target, "target", "", "remote OCI registry path, in the format 'br:HOST/PATH:TAG'.")
 	_ = cmd.MarkFlagRequired("target")
 
 	return cmd, runner
@@ -96,22 +96,12 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad bicep publish` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	file, err := cmd.Flags().GetString("file")
-	if err != nil {
-		return err
-	}
-	r.File = file
-
-	target, err := cmd.Flags().GetString("target")
-	if err != nil {
-		return err
-	}
-	if !strings.HasPrefix(target, "br:") {
+	if !strings.HasPrefix(r.Target, "br:") {
 		return &cli.FriendlyError{
-			Message: fmt.Sprintf("Invalid target %q. The target must be in the format 'br:HOST/PATH:TAG'.", target),
+			Message: fmt.Sprintf("Invalid target %q. The target must be in the format 'br:HOST/PATH:TAG'.", r.Target),
 		}
 	}
-	r.Target = strings.TrimPrefix(target, "br:")
+	r.Target = strings.TrimPrefix(r.Target, "br:")
 
 	return nil
 }

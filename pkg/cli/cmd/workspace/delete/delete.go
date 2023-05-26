@@ -51,8 +51,8 @@ rad workspace delete my-workspace`,
 		RunE: framework.RunCommand(runner),
 	}
 
-	commonflags.AddWorkspaceFlag(cmd)
-	commonflags.AddConfirmationFlag(cmd)
+	commonflags.AddWorkspaceNameFlagVar(cmd, &runner.WorkspaceOptions.Workspace)
+	commonflags.AddConfirmationFlagVar(cmd, &runner.Confirm)
 
 	return cmd, runner
 }
@@ -63,6 +63,7 @@ type Runner struct {
 	ConfigFileInterface framework.ConfigFileInterface
 	Output              output.Interface
 	InputPrompter       prompt.Interface
+	WorkspaceOptions    commonflags.WorkspaceOptions
 	Workspace           *workspaces.Workspace
 	Confirm             bool
 }
@@ -79,18 +80,15 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad workspace delete` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	workspace, err := cli.RequireWorkspaceArgs(cmd, r.ConfigHolder.Config, args)
+	err := commonflags.AcceptWorkspaceNamePositionalArg(cmd, args, &r.WorkspaceOptions.Workspace)
 	if err != nil {
 		return err
 	}
 
-	yes, err := cmd.Flags().GetBool("yes")
+	r.Workspace, err = cli.LoadWorkspace(r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig, r.WorkspaceOptions, cli.RequiresWorkspace)
 	if err != nil {
 		return err
 	}
-
-	r.Workspace = workspace
-	r.Confirm = yes
 
 	if !r.Workspace.IsNamedWorkspace() {
 		// Only workspaces stored in configuration can be deleted.

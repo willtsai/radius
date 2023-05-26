@@ -56,13 +56,13 @@ rad credential register aws --access-key-id <access-key-id> --secret-access-key 
 		RunE: framework.RunCommand(runner),
 	}
 
-	commonflags.AddOutputFlag(cmd)
+	commonflags.AddOutputFlagVar(cmd, &runner.Format)
 	commonflags.AddWorkspaceFlag(cmd)
 
-	cmd.Flags().String("access-key-id", "", "The AWS IAM access key id.")
+	cmd.Flags().StringVar(&runner.AccessKeyID, "access-key-id", "", "The AWS IAM access key id.")
 	_ = cmd.MarkFlagRequired("access-key-id")
 
-	cmd.Flags().String("secret-access-key", "", "The AWS IAM secret access key.")
+	cmd.Flags().StringVar(&runner.SecretAccessKey, "secret-access-key", "", "The AWS IAM secret access key.")
 	_ = cmd.MarkFlagRequired("secret-access-key")
 
 	return cmd, runner
@@ -97,23 +97,6 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	r.Workspace = workspace
-
-	format, err := cli.RequireOutput(cmd)
-	if err != nil {
-		return err
-	}
-	r.Format = format
-
-	accessKeyID, err := cmd.Flags().GetString("access-key-id")
-	if err != nil {
-		return err
-	}
-	secretAccessKey, err := cmd.Flags().GetString("secret-access-key")
-	if err != nil {
-		return err
-	}
-	r.AccessKeyID = accessKeyID
-	r.SecretAccessKey = secretAccessKey
 
 	if r.AccessKeyID == "" {
 		return &cli.FriendlyError{Message: fmt.Sprintf("Access Key id %q cannot be empty", r.AccessKeyID)}

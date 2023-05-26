@@ -48,7 +48,7 @@ func NewCommand(factory framework.Factory) (*cobra.Command, framework.Runner) {
 
 	commonflags.AddWorkspaceFlag(cmd)
 	commonflags.AddResourceGroupFlag(cmd)
-	commonflags.AddConfirmationFlag(cmd)
+	commonflags.AddConfirmationFlagVar(cmd, &runner.Confirm)
 
 	return cmd, runner
 }
@@ -61,7 +61,7 @@ type Runner struct {
 	InputPrompter        prompt.Interface
 	Workspace            *workspaces.Workspace
 	UCPResourceGroupName string
-	Confirmation         bool
+	Confirm              bool
 }
 
 // NewRunner creates a new instance of the `rad group delete` runner.
@@ -86,23 +86,16 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	yes, err := cmd.Flags().GetBool("yes")
-	if err != nil {
-		return err
-	}
-
 	r.UCPResourceGroupName = resourceGroup
 	r.Workspace = workspace
-	r.Confirmation = yes
 
 	return nil
 }
 
 // Run runs the `rad group delete` command.
 func (r *Runner) Run(ctx context.Context) error {
-
 	// Prompt user to confirm deletion
-	if !r.Confirmation {
+	if !r.Confirm {
 		confirmed, err := prompt.YesOrNoPrompt(
 			fmt.Sprintf("Are you sure you want to delete the resource group '%v'? A resource group can be deleted only when empty", r.UCPResourceGroupName),
 			prompt.ConfirmNo,

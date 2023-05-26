@@ -49,23 +49,20 @@ Note that these resource groups are separate from the Azure cloud provider and A
 		RunE:    framework.RunCommand(runner),
 	}
 
-	commonflags.AddResourceGroupFlag(cmd)
-	commonflags.AddWorkspaceFlag(cmd)
-	commonflags.AddOutputFlag(cmd)
+	commonflags.AddResourceGroupScopedOptionsVar(cmd, &runner.WorkspaceOptions)
+	commonflags.AddOutputFlagVar(cmd, &runner.Format)
 
 	return cmd, runner
 }
 
 // Runner is the runner implementation for the `rad group show` command.
 type Runner struct {
-	ConfigHolder         *framework.ConfigHolder
-	ConnectionFactory    connections.Factory
-	Output               output.Interface
-	Workspace            *workspaces.Workspace
-	UCPResourceGroupName string
-	ResourceType         string
-	ResourceName         string
-	Format               string
+	ConfigHolder      *framework.ConfigHolder
+	ConnectionFactory connections.Factory
+	Output            output.Interface
+	Workspace         *workspaces.Workspace
+	WorkspaceOptions  commonflags.WorkspaceOptions
+	Format            string
 }
 
 // NewRunner creates a new instance of the `rad group show` runner.
@@ -79,26 +76,15 @@ func NewRunner(factory framework.Factory) *Runner {
 
 // Validate runs validation for the `rad group show` command.
 func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
-	workspace, err := cli.RequireWorkspace(cmd, r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig)
+	err := commonflags.AcceptResourceGroupPositionalArg(cmd, args, &r.WorkspaceOptions.ResourceGroup)
 	if err != nil {
 		return err
 	}
 
-	format, err := cli.RequireOutput(cmd)
+	r.Workspace, err = cli.LoadWorkspace(r.ConfigHolder.Config, r.ConfigHolder.DirectoryConfig, r.WorkspaceOptions, cli.RequiresResourceGroup)
 	if err != nil {
 		return err
 	}
-	if format == "" {
-		format = "table"
-	}
-	resourcegroup, err := cli.RequireUCPResourceGroup(cmd, args)
-	if err != nil {
-		return err
-	}
-
-	r.Format = format
-	r.UCPResourceGroupName = resourcegroup
-	r.Workspace = workspace
 
 	return nil
 }
@@ -111,7 +97,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 
-	resourceGroup, err := client.ShowUCPGroup(ctx, "radius", "local", r.UCPResourceGroupName)
+	resourceGroup, err := client.ShowUCPGroup(ctx, "radius", "local", r.Workspace.ResourceGroup)
 	if err != nil {
 		return err
 	}
