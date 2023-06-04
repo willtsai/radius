@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/project-radius/radius/pkg/recipes"
 	"github.com/project-radius/radius/pkg/recipes/terraform/config"
 	"github.com/project-radius/radius/pkg/sdk"
@@ -65,7 +66,11 @@ func Deploy(ctx context.Context, ucpConn *sdk.Connection, tfDir string, configur
 		return nil, err
 	}
 
-	// TODO Run TF Init and Apply
+	// Run TF Init and Apply
+	_, err = initAndApply(ctx, workingDir, execPath)
+	if err != nil {
+		return nil, err
+	}
 
 	// TODO Retun recipe output
 
@@ -82,4 +87,28 @@ func createWorkingDir(ctx context.Context, tfDir string) (string, error) {
 	}
 
 	return workingDir, nil
+}
+
+// Runs Terraform init and apply in the provided working directory.
+func initAndApply(ctx context.Context, workingDir, execPath string) (*recipes.RecipeOutput, error) {
+	logger := logr.FromContextOrDiscard(ctx)
+
+	tf, err := tfexec.NewTerraform(workingDir, execPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize Terraform
+	logger.Info("Initializing Terraform")
+	if err := tf.Init(ctx); err != nil {
+		return nil, fmt.Errorf("terraform init failure: %w", err)
+	}
+
+	// Apply Terraform configuration
+	logger.Info("Running Terraform apply")
+	if err := tf.Apply(ctx); err != nil {
+		return nil, fmt.Errorf("terraform apply failure: %w", err)
+	}
+
+	return nil, nil
 }
