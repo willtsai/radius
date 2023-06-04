@@ -16,6 +16,7 @@ package driver
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
@@ -49,8 +50,22 @@ func (d *terraformDriver) Execute(ctx context.Context, configuration recipes.Con
 	terraformDir := terraformDirRoot + "/" + util.NormalizeStringToLower(recipe.ResourceID) + "-" + uuid.NewString()
 	recipeOutputs, err := terraform.Deploy(ctx, &d.UcpConn, terraformDir, &configuration, &recipe, &definition)
 	if err != nil {
+		cleanup(ctx, terraformDir)
 		return nil, err
 	}
 
+	// Cleanup Terraform directories
+	cleanup(ctx, terraformDir)
+
 	return recipeOutputs, nil
+}
+
+func cleanup(ctx context.Context, tfDir string) {
+	logger := logr.FromContextOrDiscard(ctx)
+	// TODO Delete Kubernetes Secrets
+	// k8s.DeleteSecrets(ctx, tfDir)
+	err := os.RemoveAll(tfDir)
+	if err != nil {
+		logger.Error(err, "Failed to remove Terraform installation directory")
+	}
 }
