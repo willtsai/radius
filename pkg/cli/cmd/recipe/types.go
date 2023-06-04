@@ -17,7 +17,8 @@ limitations under the License.
 package recipe
 
 const (
-	TemplateKindBicep = "bicep"
+	TemplateKindBicep     = "bicep"
+	TemplateKindTerraform = "terraform"
 )
 
 type EnvironmentRecipe struct {

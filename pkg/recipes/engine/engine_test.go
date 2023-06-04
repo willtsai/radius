@@ -47,7 +47,8 @@ func setup(t *testing.T) (engine, configloader.MockConfigurationLoader, driver.M
 	options := Options{
 		ConfigurationLoader: configLoader,
 		Drivers: map[string]driver.Driver{
-			"bicep": mDriver,
+			recipes.TemplateKindBicep:     mDriver,
+			recipes.TemplateKindTerraform: mDriver,
 		},
 	}
 	engine := engine{
