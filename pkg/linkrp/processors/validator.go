@@ -17,6 +17,7 @@ limitations under the License.
 package processors
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -274,6 +275,13 @@ func convertToInt32(value any) (int32, bool) {
 		return int32(v), true
 	case float64:
 		return int32(v), true
+	case json.Number:
+		// Terraform uses json.Number for int outputs
+		intValue, err := v.Int64()
+		if err != nil {
+			return int32(0), false
+		}
+		return int32(intValue), true
 	default:
 		return int32(0), false
 	}

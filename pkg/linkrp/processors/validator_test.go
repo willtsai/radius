@@ -17,6 +17,7 @@ limitations under the License.
 package processors
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/project-radius/radius/pkg/linkrp"
@@ -705,6 +706,35 @@ func Test_Validator_TypeConversions_Int32(t *testing.T) {
 		require.Equal(t, int32(43), model.Int32Field)
 		require.Equal(t, int32(43), v.ConnectionValues["test"])
 		require.Empty(t, v.ConnectionSecrets)
+	})
+
+	t.Run("conversion from json.Number", func(t *testing.T) {
+		v := NewValidator(&map[string]any{}, &map[string]rpv1.SecretValueReference{}, &[]rpv1.OutputResource{})
+
+		model := testDatamodel{
+			Int32Field: 0,
+		}
+		v.AddOptionalInt32Field("test", &model.Int32Field)
+
+		err := v.SetAndValidate(&recipes.RecipeOutput{Values: map[string]any{"test": json.Number("43")}})
+		require.NoError(t, err)
+		require.Equal(t, int32(43), model.Int32Field)
+		require.Equal(t, int32(43), v.ConnectionValues["test"])
+		require.Empty(t, v.ConnectionSecrets)
+	})
+
+	t.Run("conversion from json.Number failure", func(t *testing.T) {
+		v := NewValidator(&map[string]any{}, &map[string]rpv1.SecretValueReference{}, &[]rpv1.OutputResource{})
+
+		model := testDatamodel{
+			Int32Field: 0,
+		}
+		v.AddOptionalInt32Field("test", &model.Int32Field)
+
+		err := v.SetAndValidate(&recipes.RecipeOutput{Values: map[string]any{"test": json.Number("invalid")}})
+		require.Error(t, err)
+		require.IsType(t, &ValidationError{}, err)
+		require.Equal(t, "the connection value \"test\" provided by the recipe is expected to be a int32, got json.Number", err.Error())
 	})
 
 	t.Run("failed conversion", func(t *testing.T) {
