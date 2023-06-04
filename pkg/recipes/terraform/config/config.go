@@ -33,8 +33,26 @@ const (
 	terraformVersion = "1.1.0" // TODO make it configurable
 )
 
+var (
+	// TODO Outputs mapping between expected Radius resource outputs and module outputs.
+	// This is hardcoded for now until integrated with the recipe definition (should be provided at recipe registration)
+	outputValues = map[string]string{
+		"host": "host",
+		"port": "port",
+	}
+
+	outputSecrets = map[string]string{
+		"connectionString": "connectionString",
+	}
+)
+
 func GenerateConfigFiles(ctx context.Context, ucpConn *sdk.Connection, tfProviders []TerraformProviderMetadata, configuration *recipes.Configuration, recipe *recipes.Metadata, definition *recipes.Definition, workingDir string) error {
-	err := generateJSONConfig(ctx, ucpConn, tfProviders, configuration, recipe, definition, workingDir)
+	err := generateMainConfig(ctx, ucpConn, tfProviders, configuration, recipe, definition, workingDir)
+	if err != nil {
+		return err
+	}
+
+	err = generateOutputConfig(recipe.Name, workingDir)
 	if err != nil {
 		return err
 	}
@@ -47,7 +65,7 @@ func GenerateConfigFiles(ctx context.Context, ucpConn *sdk.Connection, tfProvide
 // and apply Terraform modules. See https://www.terraform.io/docs/language/syntax/json.html
 // for more information on the JSON syntax for Terraform configuration.
 // templatePath is the path to the Terraform module source, e.g. "Azure/cosmosdb/azurerm".
-func generateJSONConfig(ctx context.Context, ucpConn *sdk.Connection, tfProviders []TerraformProviderMetadata, configuration *recipes.Configuration, recipe *recipes.Metadata, definition *recipes.Definition, workingDir string) error {
+func generateMainConfig(ctx context.Context, ucpConn *sdk.Connection, tfProviders []TerraformProviderMetadata, configuration *recipes.Configuration, recipe *recipes.Metadata, definition *recipes.Definition, workingDir string) error {
 	providerConfigs, resourceGroup, err := getProviderConfigs(ctx, ucpConn, tfProviders, &configuration.Providers)
 	if err != nil {
 		return err
@@ -92,6 +110,43 @@ func generateJSONConfig(ctx context.Context, ucpConn *sdk.Connection, tfProvider
 	defer file.Close()
 
 	_, err = file.Write(jsonData)
+	if err != nil {
+		return fmt.Errorf("error writing to file: %w", err)
+	}
+
+	return nil
+}
+
+func generateOutputConfig(recipeName, workingDir string) error {
+	outputBlock := ""
+	outputBlock += `output "values" {
+		value = {
+	  `
+	for key, value := range outputValues {
+		outputBlock += fmt.Sprintf("    %s = module.%s.%s,\n", key, recipeName, value)
+	}
+	outputBlock += `  }
+}
+`
+	// Generate secrets block
+	outputBlock += `output "secrets" {
+		value = {
+	  `
+	for key, value := range outputSecrets {
+		outputBlock += fmt.Sprintf("    %s = module.%s.%s,\n", key, recipeName, value)
+	}
+	outputBlock += `  }
+		sensitive = true
+	  }`
+
+	outputFilePath := fmt.Sprintf("%s/output.tf", workingDir)
+	file, err := os.Create(outputFilePath)
+	if err != nil {
+		return fmt.Errorf("error creating file: %w", err)
+	}
+	defer file.Close()
+
+	_, err = file.Write([]byte(outputBlock))
 	if err != nil {
 		return fmt.Errorf("error writing to file: %w", err)
 	}

@@ -67,14 +67,12 @@ func Deploy(ctx context.Context, ucpConn *sdk.Connection, tfDir string, configur
 	}
 
 	// Run TF Init and Apply
-	_, err = initAndApply(ctx, workingDir, execPath)
+	recipeOutputs, err := initAndApply(ctx, workingDir, execPath)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO Retun recipe output
-
-	return nil, nil
+	return recipeOutputs, nil
 }
 
 func createWorkingDir(ctx context.Context, tfDir string) (string, error) {
@@ -110,5 +108,25 @@ func initAndApply(ctx context.Context, workingDir, execPath string) (*recipes.Re
 		return nil, fmt.Errorf("terraform apply failure: %w", err)
 	}
 
-	return nil, nil
+	logger.Info("Fetching module outputs")
+	tfState, err := tf.Show(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	recipeOutput := recipes.RecipeOutput{
+		Secrets: make(map[string]interface{}),
+		Values:  make(map[string]interface{}),
+	}
+	outputs := tfState.Values.Outputs
+	// Access the "secrets" key and assign it to the RecipeOutput struct
+	if secretOutputs, ok := outputs["secrets"]; ok {
+		recipeOutput.Secrets = secretOutputs.Value.(map[string]interface{})
+	}
+	// Access the "values" key and assign it to the RecipeOutput struct
+	if valuesOutputs, ok := outputs["values"]; ok {
+		recipeOutput.Values = valuesOutputs.Value.(map[string]interface{})
+	}
+
+	return &recipeOutput, nil
 }
