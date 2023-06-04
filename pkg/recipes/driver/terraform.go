@@ -15,9 +15,19 @@ package driver
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/go-logr/logr"
+	"github.com/google/uuid"
 	"github.com/project-radius/radius/pkg/recipes"
+	"github.com/project-radius/radius/pkg/recipes/terraform"
 	"github.com/project-radius/radius/pkg/sdk"
+	"github.com/project-radius/radius/pkg/ucp/util"
+)
+
+const (
+	// terraformDirRoot = "/terraform" // TODO make it configurable
+	terraformDirRoot = "/tmp/terraform" // Temporary for local testing
 )
 
 var _ Driver = (*terraformDriver)(nil)
@@ -33,6 +43,14 @@ type terraformDriver struct {
 
 // Execute executes a Terraform recipe by using the Terraform CLI through terraform-exec
 func (d *terraformDriver) Execute(ctx context.Context, configuration recipes.Configuration, recipe recipes.Metadata, definition recipes.Definition) (*recipes.RecipeOutput, error) {
+	logger := logr.FromContextOrDiscard(ctx)
 
-	return nil, nil
+	logger.Info(fmt.Sprintf("Deploying recipe: %q, template: %q", recipe.Name, definition.TemplatePath))
+	terraformDir := terraformDirRoot + "/" + util.NormalizeStringToLower(recipe.ResourceID) + "-" + uuid.NewString()
+	recipeOutputs, err := terraform.Deploy(ctx, &d.UcpConn, terraformDir, &configuration, &recipe, &definition)
+	if err != nil {
+		return nil, err
+	}
+
+	return recipeOutputs, nil
 }
