@@ -19,10 +19,28 @@ package terraform
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/go-logr/logr"
 	"github.com/project-radius/radius/pkg/recipes"
+	"github.com/project-radius/radius/pkg/recipes/terraform/config"
 	"github.com/project-radius/radius/pkg/sdk"
+)
+
+var (
+	// TODO this is a placeholder for now - we need to get the providers from the user or automatically detect from the module
+	tfProviders = []config.TerraformProviderMetadata{
+		{
+			Type: "azurerm",
+		},
+		{
+			Type: "aws",
+		},
+		{
+			Type: "kubernetes",
+		},
+	}
 )
 
 func Deploy(ctx context.Context, ucpConn *sdk.Connection, tfDir string, configuration *recipes.Configuration, recipe *recipes.Metadata, definition *recipes.Definition) (*recipes.RecipeOutput, error) {
@@ -33,16 +51,35 @@ func Deploy(ctx context.Context, ucpConn *sdk.Connection, tfDir string, configur
 	if err != nil {
 		return nil, err
 	}
-
 	logger.Info(fmt.Sprintf("Terraform installation path: %q", execPath))
 
-	// TODO Create Working Directory
+	// Create Working Directory
+	workingDir, err := createWorkingDir(ctx, tfDir)
+	if err != nil {
+		return nil, err
+	}
 
-	// TODO Generate Terraform json config in the working directory
+	// Generate Terraform json config in the working directory
+	err = config.GenerateConfigFiles(ctx, ucpConn, tfProviders, configuration, recipe, definition, workingDir)
+	if err != nil {
+		return nil, err
+	}
 
 	// TODO Run TF Init and Apply
 
 	// TODO Retun recipe output
 
 	return nil, nil
+}
+
+func createWorkingDir(ctx context.Context, tfDir string) (string, error) {
+	logger := logr.FromContextOrDiscard(ctx)
+
+	workingDir := filepath.Join(tfDir, "exec")
+	logger.Info(fmt.Sprintf("Creating Terraform working directory: %q", workingDir))
+	if err := os.MkdirAll(workingDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create working directory for terraform execution: %w", err)
+	}
+
+	return workingDir, nil
 }
