@@ -64,6 +64,8 @@ spec:
         volumeMounts:
         - name: config-volume
           mountPath: /etc/config
+        - name: terraform
+          mountPath: /terraform
         securityContext:
           allowPrivilegeEscalation: false
         {{- if .Values.rp.resources }}
