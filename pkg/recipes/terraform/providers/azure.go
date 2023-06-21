@@ -38,20 +38,20 @@ const (
 
 // Returns the Terraform provider configuration for Azure provider.
 // https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs
-func BuildAzureProviderConfig(ctx context.Context, ucpConn *sdk.Connection, scope string) (map[string]interface{}, string, error) {
+func BuildAzureProviderConfig(ctx context.Context, ucpConn *sdk.Connection, scope string) (map[string]interface{}, error) {
 	logger := logr.FromContextOrDiscard(ctx)
 	if scope == "" {
-		return map[string]interface{}{}, "", nil
+		return map[string]interface{}{}, nil
 	}
 
-	subscriptionID, resourceGroup, err := parseAzureScope(scope)
+	subscriptionID, _, err := parseAzureScope(scope)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	credentials, err := fetchAzureCredentials(ucpConn)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	logger.Info(fmt.Sprintf("Fetched Azure credentials for client id %q", credentials.ClientID))
 
@@ -63,7 +63,7 @@ func BuildAzureProviderConfig(ctx context.Context, ucpConn *sdk.Connection, scop
 		"features":        map[string]interface{}{},
 	}
 
-	return azureConfig, resourceGroup, nil
+	return azureConfig, nil
 }
 
 func parseAzureScope(scope string) (subscriptionID string, resourceGroup string, err error) {
@@ -87,6 +87,7 @@ func parseAzureScope(scope string) (subscriptionID string, resourceGroup string,
 
 func fetchAzureCredentials(ucpConn *sdk.Connection) (*credentials.AzureCredential, error) {
 	// TODO add client.Get to validate that credentials exist
+	// https://dev.azure.com/azure-octo/Incubations/_workitems/edit/7693
 
 	secretProvider := provider.NewSecretProvider(provider.SecretProviderOptions{
 		Provider: provider.TypeKubernetesSecret,

@@ -18,8 +18,8 @@ package config
 
 import (
 	"context"
+	"crypto/sha1"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -36,17 +36,18 @@ const (
 var (
 	// TODO Outputs mapping between expected Radius resource outputs and module outputs.
 	// This is hardcoded for now until integrated with the recipe definition (should be provided at recipe registration)
-	outputValues = map[string]string{
+	// https://dev.azure.com/azure-octo/Incubations/_workitems/edit/7673
+	outputMappingValues = map[string]string{
 		"host": "host",
 		"port": "port",
 	}
 
-	outputSecrets = map[string]string{
+	outputMappingSecrets = map[string]string{
 		"connectionString": "connectionString",
 	}
 )
 
-func GenerateConfigFiles(ctx context.Context, ucpConn *sdk.Connection, tfProviders []TerraformProviderMetadata, configuration *recipes.Configuration, recipe *recipes.Metadata, definition *recipes.Definition, workingDir string) error {
+func GenerateConfigFiles(ctx context.Context, ucpConn *sdk.Connection, tfProviders []TerraformProviderMetadata, configuration *recipes.Configuration, recipe *recipes.ResourceMetadata, definition *recipes.EnvironmentDefinition, workingDir string) error {
 	err := generateMainConfig(ctx, ucpConn, tfProviders, configuration, recipe, definition, workingDir)
 	if err != nil {
 		return err
@@ -65,13 +66,13 @@ func GenerateConfigFiles(ctx context.Context, ucpConn *sdk.Connection, tfProvide
 // and apply Terraform modules. See https://www.terraform.io/docs/language/syntax/json.html
 // for more information on the JSON syntax for Terraform configuration.
 // templatePath is the path to the Terraform module source, e.g. "Azure/cosmosdb/azurerm".
-func generateMainConfig(ctx context.Context, ucpConn *sdk.Connection, tfProviders []TerraformProviderMetadata, configuration *recipes.Configuration, recipe *recipes.Metadata, definition *recipes.Definition, workingDir string) error {
-	providerConfigs, resourceGroup, err := getProviderConfigs(ctx, ucpConn, tfProviders, &configuration.Providers)
+func generateMainConfig(ctx context.Context, ucpConn *sdk.Connection, tfProviders []TerraformProviderMetadata, configuration *recipes.Configuration, recipe *recipes.ResourceMetadata, definition *recipes.EnvironmentDefinition, workingDir string) error {
+	providerConfigs, err := getProviderConfigs(ctx, ucpConn, tfProviders, &configuration.Providers)
 	if err != nil {
 		return err
 	}
 
-	moduleData, err := generateModuleDataFromParams(ctx, definition.TemplatePath, resourceGroup, recipe.Parameters, definition.Parameters)
+	moduleData, err := generateModuleData(ctx, definition.TemplatePath, recipe.Parameters, definition.Parameters)
 	if err != nil {
 		return err
 	}
@@ -117,65 +118,25 @@ func generateMainConfig(ctx context.Context, ucpConn *sdk.Connection, tfProvider
 	return nil
 }
 
-func generateOutputConfig(recipeName, workingDir string) error {
-	outputBlock := ""
-	outputBlock += `output "values" {
-		value = {
-	  `
-	for key, value := range outputValues {
-		outputBlock += fmt.Sprintf("    %s = module.%s.%s,\n", key, recipeName, value)
-	}
-	outputBlock += `  }
-}
-`
-	// Generate secrets block
-	outputBlock += `output "secrets" {
-		value = {
-	  `
-	for key, value := range outputSecrets {
-		outputBlock += fmt.Sprintf("    %s = module.%s.%s,\n", key, recipeName, value)
-	}
-	outputBlock += `  }
-		sensitive = true
-	  }`
-
-	outputFilePath := fmt.Sprintf("%s/output.tf", workingDir)
-	file, err := os.Create(outputFilePath)
-	if err != nil {
-		return fmt.Errorf("error creating file: %w", err)
-	}
-	defer file.Close()
-
-	_, err = file.Write([]byte(outputBlock))
-	if err != nil {
-		return fmt.Errorf("error writing to file: %w", err)
-	}
-
-	return nil
-}
-
-func generateModuleDataFromParams(ctx context.Context, source, resourceGroup string, devParams, operatorParams map[string]interface{}) (map[string]interface{}, error) {
+func generateModuleData(ctx context.Context, source string, resourceParams, envParams map[string]interface{}) (map[string]interface{}, error) {
 	moduleConfig := map[string]interface{}{
-		"source":  source,
-		"version": "1.0.0",
+		ModuleSourceKey:  source,
+		ModuleVersionKey: "1.0.0", // This is module version and needs to come from the user - TODO: https://dev.azure.com/azure-octo/Incubations/_workitems/edit/8137
 	}
 
-	for key, value := range operatorParams {
+	// Populate recipe parameters
+	// Resource parameter overrides parameter set on the recipe definition in the environment,
+	// if same parameter is defined in both environment and resource recipe metadata.
+	for key, value := range envParams {
 		moduleConfig[key] = value
 	}
 
-	for key, value := range devParams {
+	for key, value := range resourceParams {
 		moduleConfig[key] = value
 	}
 
-	// Workaround for now to pass resource group param name until the design is finalized
-	if rgParam, ok := moduleConfig["resourceGroupParamName"]; ok {
-		if resourceGroup == "" {
-			return nil, errors.New("azure provider is not registered to the environment")
-		}
-		moduleConfig[rgParam.(string)] = resourceGroup
-	}
-	delete(moduleConfig, "resourceGroupParamName")
+	// TODO add context parameter if present in the module
+	// https://dev.azure.com/azure-octo/Incubations/_workitems/edit/8399
 
 	return moduleConfig, nil
 }
@@ -201,11 +162,53 @@ func generateSecretSuffix(resourceID string) (string, error) {
 		return "", err
 	}
 
-	var names []string
-	for _, segment := range parsedID.ScopeSegments() {
-		names = append(names, segment.Name)
+	name := parsedID.Name()
+	maxResourceNameLen := 22
+	if len(name) >= maxResourceNameLen {
+		name = name[:maxResourceNameLen]
 	}
-	suffix := strings.Join(names, "-")
+
+	hasher := sha1.New()
+	_, _ = hasher.Write([]byte(strings.ToLower(parsedID.String())))
+	hash := hasher.Sum(nil)
+
+	suffix := fmt.Sprintf("%s.%x", name, hash)
 
 	return suffix, nil
+}
+
+// Generate output.tf file that references module outputs to populate expected Radius resource outputs.
+// Outputs of modules are accessible through this format: module.<MODULE NAME>.<OUTPUT NAME>
+func generateOutputConfig(recipeName, workingDir string) error {
+	outputFilePath := fmt.Sprintf("%s/output.tf", workingDir)
+	// Create a new output file object
+	outputFile, err := os.Create(outputFilePath)
+	if err != nil {
+		return fmt.Errorf("error creating output.tf file: %w", err)
+	}
+
+	// Write the `output` blocks
+	fmt.Fprintf(outputFile, "output \"values\" {\n")
+	fmt.Fprintf(outputFile, "  value = {\n")
+	for radiusResourceOutput, moduleOutput := range outputMappingValues {
+		fmt.Fprintf(outputFile, "    %s = module.%s.%s,\n", radiusResourceOutput, recipeName, moduleOutput)
+	}
+	fmt.Fprintf(outputFile, "  }\n")
+	fmt.Fprintf(outputFile, "}\n\n")
+
+	fmt.Fprintf(outputFile, "output \"secrets\" {\n")
+	fmt.Fprintf(outputFile, "  value = {\n")
+	for radiusResourceOutput, moduleOutput := range outputMappingSecrets {
+		fmt.Fprintf(outputFile, "    %s = module.%s.%s,\n", radiusResourceOutput, recipeName, moduleOutput)
+	}
+	fmt.Fprintf(outputFile, "  }\n")
+	fmt.Fprintf(outputFile, "  sensitive = true\n")
+	fmt.Fprintf(outputFile, "}\n")
+
+	err = outputFile.Close()
+	if err != nil {
+		return fmt.Errorf("error closing the file: %w", err)
+	}
+
+	return nil
 }

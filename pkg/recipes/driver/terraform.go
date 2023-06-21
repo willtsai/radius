@@ -43,7 +43,7 @@ type terraformDriver struct {
 }
 
 // Execute executes a Terraform recipe by using the Terraform CLI through terraform-exec
-func (d *terraformDriver) Execute(ctx context.Context, configuration recipes.Configuration, recipe recipes.Metadata, definition recipes.Definition) (*recipes.RecipeOutput, error) {
+func (d *terraformDriver) Execute(ctx context.Context, configuration recipes.Configuration, recipe recipes.ResourceMetadata, definition recipes.EnvironmentDefinition) (*recipes.RecipeOutput, error) {
 	logger := logr.FromContextOrDiscard(ctx)
 
 	logger.Info(fmt.Sprintf("Deploying recipe: %q, template: %q", recipe.Name, definition.TemplatePath))

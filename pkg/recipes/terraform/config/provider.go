@@ -52,37 +52,34 @@ func getRequiredProviders(providers []TerraformProviderMetadata) map[string]Prov
 	return requiredProviders
 }
 
-// Returns Terraform provider configurations for the required providers and
-// Azure resource group tied to Environment's scope if Azure provider is required.
-func getProviderConfigs(ctx context.Context, ucpConn *sdk.Connection, providers []TerraformProviderMetadata, envProviders *datamodel.Providers) (map[string]interface{}, string, error) {
+// Returns Terraform provider configurations for the required providers
+func getProviderConfigs(ctx context.Context, ucpConn *sdk.Connection, providers []TerraformProviderMetadata, envProviders *datamodel.Providers) (map[string]interface{}, error) {
 	providerConfigs := make(map[string]interface{})
-	resourceGroup := ""
 
 	for _, provider := range providers {
 		switch provider.Type {
 		case tf_providers.AWSProviderName:
 			config, err := tf_providers.BuildAWSProviderConfig(ctx, ucpConn, envProviders.AWS.Scope)
 			if err != nil {
-				return nil, "", err
+				return nil, err
 			}
 			providerConfigs[tf_providers.AWSProviderName] = config
 		case tf_providers.AzureProviderName:
-			config, rg, err := tf_providers.BuildAzureProviderConfig(ctx, ucpConn, envProviders.Azure.Scope)
+			config, err := tf_providers.BuildAzureProviderConfig(ctx, ucpConn, envProviders.Azure.Scope)
 			if err != nil {
-				return nil, "", err
+				return nil, err
 			}
-			resourceGroup = rg
 			providerConfigs[tf_providers.AzureProviderName] = config
 		case tf_providers.KubernetesProviderName:
 			config, err := tf_providers.BuildKubernetesProviderConfig(ctx)
 			if err != nil {
-				return nil, "", err
+				return nil, err
 			}
 			providerConfigs[tf_providers.KubernetesProviderName] = config
 		default:
-			return nil, "", fmt.Errorf("unsupported provider type: %s", provider.Type)
+			return nil, fmt.Errorf("unsupported provider type: %s", provider.Type)
 		}
 	}
 
-	return providerConfigs, resourceGroup, nil
+	return providerConfigs, nil
 }

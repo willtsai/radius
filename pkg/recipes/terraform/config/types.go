@@ -16,6 +16,11 @@ limitations under the License.
 
 package config
 
+const (
+	ModuleSourceKey  = "source"
+	ModuleVersionKey = "version"
+)
+
 type TerraformConfig struct {
 	Terraform TerraformDefinition    `json:"terraform"`
 	Provider  map[string]interface{} `json:"provider"`

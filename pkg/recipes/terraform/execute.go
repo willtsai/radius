@@ -44,7 +44,7 @@ var (
 	}
 )
 
-func Deploy(ctx context.Context, ucpConn *sdk.Connection, tfDir string, configuration *recipes.Configuration, recipe *recipes.Metadata, definition *recipes.Definition) (*recipes.RecipeOutput, error) {
+func Deploy(ctx context.Context, ucpConn *sdk.Connection, tfDir string, configuration *recipes.Configuration, recipe *recipes.ResourceMetadata, definition *recipes.EnvironmentDefinition) (*recipes.RecipeOutput, error) {
 	logger := logr.FromContextOrDiscard(ctx)
 
 	// Install Terraform
