@@ -70,7 +70,7 @@ const (
 var usesDNSSD = false
 
 // this flag is used to indicate whether or not this resource needs a service to be generated.
-// this flag is triggered when a container has an exposed port, but no 'provides' field.
+// this flag is triggered when a container has an exposed port(s), but no 'provides' field.
 var needsServiceGeneration = false
 
 // GetSupportedKinds returns a list of supported volume kinds
@@ -133,6 +133,7 @@ func (r Renderer) GetDependencyIDs(ctx context.Context, dm v1.DataModelInterface
 
 	for _, port := range properties.Container.Ports {
 		// if the container has an exposed port, note that down.
+		// A single service will be generated for a container with one or more exposed ports.
 		if port.ContainerPort != 0 && port.Provides == ""{
 			needsServiceGeneration = true
 		}
@@ -224,13 +225,13 @@ func (r Renderer) Render(ctx context.Context, dm v1.DataModelInterface, options 
 
 	if needsServiceGeneration {
 		// generate computed values for the service.
-		serviceComputedValues, containerPortValue, err := r.generateServiceComputedValues(resource)
+		serviceComputedValues, containerPortValues, containerPortNames, err := r.generateServiceComputedValues(resource)
 		if err != nil {
 			return renderers.RendererOutput{}, err
 		}
 
 		// if a container has an exposed port, then we need to create a service for it.
-		serviceResource, err := r.makeService(resource, options, ctx, containerPortValue)
+		serviceResource, err := r.makeService(resource, options, ctx, containerPortValues, containerPortNames)
 		if err != nil {
 			return renderers.RendererOutput{}, err
 		}
@@ -251,13 +252,17 @@ func (r Renderer) Render(ctx context.Context, dm v1.DataModelInterface, options 
 	}, nil
 }
 
-func (r Renderer) generateServiceComputedValues(resource *datamodel.ContainerResource) (map[string]rpv1.ComputedValueReference, int32, error) {
+func (r Renderer) generateServiceComputedValues(resource *datamodel.ContainerResource) (map[string]rpv1.ComputedValueReference, []int32, []string, error) {
 	serviceComputedValues := map[string]rpv1.ComputedValueReference{}
-	var containerPortValue int32
+	var containerPortValues []int32
+	var containerPortNames []string
 		
 		// Assumes container has 1 exposed port.
-		for _, port := range resource.Properties.Container.Ports {
-			containerPortValue = port.ContainerPort
+		for portName, port := range resource.Properties.Container.Ports {
+			// store portNames and portValues for use in service generation.
+			containerPortNames = append(containerPortNames, portName)
+			containerPortValues = append(containerPortValues, port.ContainerPort)
+
 			serviceComputedValues = map[string]rpv1.ComputedValueReference{
 				"hostname": {
 					Value: kubernetes.NormalizeResourceName(resource.Name),
@@ -272,15 +277,12 @@ func (r Renderer) generateServiceComputedValues(resource *datamodel.ContainerRes
 					Value: "http",
 				},
 			}
-
-			// only capture one exposed port.
-			break
 		}
 	
-	return serviceComputedValues, containerPortValue, nil
+	return serviceComputedValues, containerPortValues, containerPortNames, nil
 }
 
-func (r Renderer) makeService(resource *datamodel.ContainerResource, options renderers.RenderOptions, ctx context.Context, containerPortValue int32) (rpv1.OutputResource, error) {
+func (r Renderer) makeService(resource *datamodel.ContainerResource, options renderers.RenderOptions, ctx context.Context, containerPortValues []int32, containerPortNames []string) (rpv1.OutputResource, error) {
 	appId, err := resources.ParseResource(resource.Properties.Application)
 	if err != nil {
 		return rpv1.OutputResource{}, v1.NewClientErrInvalidRequest(fmt.Sprintf("invalid application id: %s. id: %s", err.Error(), resource.Properties.Application))
@@ -288,6 +290,17 @@ func (r Renderer) makeService(resource *datamodel.ContainerResource, options ren
 
 	typeParts := strings.Split(ResourceType, "/")
 	resourceTypeSuffix := typeParts[len(typeParts)-1]
+
+	// create the ports that will be exposed by the service.
+	ports := []corev1.ServicePort{}
+	for i, port := range containerPortValues {
+		ports = append(ports, corev1.ServicePort{
+			Name:       containerPortNames[i],
+			Port:       port,
+			TargetPort: intstr.FromString(kubernetes.GetShortenedTargetPortName(resourceTypeSuffix + resource.Name)),
+			Protocol:  corev1.ProtocolTCP,
+		})
+	}
 
 	service := &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
@@ -303,14 +316,7 @@ func (r Renderer) makeService(resource *datamodel.ContainerResource, options ren
 		Spec: corev1.ServiceSpec{
 			Selector: kubernetes.MakeRouteSelectorLabels(appId.Name(), resourceTypeSuffix, resource.Name),
 			Type:     corev1.ServiceTypeClusterIP,
-			Ports: []corev1.ServicePort{
-				{
-					Name:       resource.Name,
-					Port:       containerPortValue,
-					TargetPort: intstr.FromString(kubernetes.GetShortenedTargetPortName(resourceTypeSuffix + resource.Name)),
-					Protocol:   corev1.ProtocolTCP,
-				},
-			},
+			Ports: ports,
 		},
 	}
 
