@@ -26,6 +26,12 @@ resource env 'Applications.Core/environments@2022-03-15-privatepreview' = {
       resourceId: 'self'
       namespace: 'corerp-resources-environment-rabbitmq-recipe-env'
     }
+    supportedExtensions: {
+      'dapr.io/sidecar': {
+        templatePath: '${registry}/test/functional/corerp/recipes/rabbitmq-recipe:${version}'
+        kind: 'jsonnet'
+      }
+    }
     recipes: {
       'Applications.Link/rabbitMQMessageQueues': {
         default: {

@@ -1,0 +1,4 @@
+{
+    "kind": "contoso.com/applicationInsights",
+    "connectionString": "asdf"
+}

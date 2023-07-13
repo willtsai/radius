@@ -1,0 +1,174 @@
+{
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+        "creationTimestamp": "2023-07-13T02:41:51Z",
+        "name": "ready",
+        "namespace": "default",
+        "resourceVersion": "483361",
+        "uid": "58a677b6-0bea-4c96-89ef-89349668f190"
+    },
+    "status": {
+        "phase": "Pending",
+        "qosClass": "BestEffort"
+    }
+}
+{
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+        "creationTimestamp": "2023-07-13T02:41:51Z",
+        "name": "ready",
+        "namespace": "default",
+        "resourceVersion": "483362",
+        "uid": "58a677b6-0bea-4c96-89ef-89349668f190"
+    },
+    "status": {
+        "conditions": [
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2023-07-13T02:41:51Z",
+                "status": "True",
+                "type": "PodScheduled"
+            }
+        ],
+        "phase": "Pending",
+        "qosClass": "BestEffort"
+    }
+}
+{
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+        "creationTimestamp": "2023-07-13T02:41:51Z",
+        "name": "ready",
+        "namespace": "default",
+        "resourceVersion": "483364",
+        "uid": "58a677b6-0bea-4c96-89ef-89349668f190"
+    },
+    "status": {
+        "conditions": [
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2023-07-13T02:41:51Z",
+                "status": "True",
+                "type": "Initialized"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2023-07-13T02:41:51Z",
+                "message": "containers with unready status: [sise]",
+                "reason": "ContainersNotReady",
+                "status": "False",
+                "type": "Ready"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2023-07-13T02:41:51Z",
+                "message": "containers with unready status: [sise]",
+                "reason": "ContainersNotReady",
+                "status": "False",
+                "type": "ContainersReady"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2023-07-13T02:41:51Z",
+                "status": "True",
+                "type": "PodScheduled"
+            }
+        ],
+        "containerStatuses": [
+            {
+                "image": "quay.io/openshiftlabs/simpleservice:0.5.0",
+                "imageID": "",
+                "lastState": {},
+                "name": "sise",
+                "ready": false,
+                "restartCount": 0,
+                "started": false,
+                "state": {
+                    "waiting": {
+                        "reason": "ContainerCreating"
+                    }
+                }
+            }
+        ],
+        "hostIP": "172.18.0.2",
+        "phase": "Pending",
+        "qosClass": "BestEffort",
+        "startTime": "2023-07-13T02:41:51Z"
+    }
+}
+{
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+        "annotations": {
+            "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Pod\",\"metadata\":{\"annotations\":{},\"name\":\"ready\",\"namespace\":\"default\"},\"spec\":{\"containers\":[{\"image\":\"quay.io/openshiftlabs/simpleservice:0.5.0\",\"name\":\"sise\",\"ports\":[{\"containerPort\":9876}],\"readinessProbe\":{\"httpGet\":{\"path\":\"/healthzzzzzzzzz\",\"port\":9876},\"initialDelaySeconds\":10}}]}}\n"
+        },
+        "creationTimestamp": "2023-07-13T02:41:51Z",
+        "name": "ready",
+        "namespace": "default",
+        "resourceVersion": "483370",
+        "uid": "58a677b6-0bea-4c96-89ef-89349668f190"
+    },
+    "status": {
+        "conditions": [
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2023-07-13T02:41:51Z",
+                "status": "True",
+                "type": "Initialized"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2023-07-13T02:41:51Z",
+                "message": "containers with unready status: [sise]",
+                "reason": "ContainersNotReady",
+                "status": "False",
+                "type": "Ready"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2023-07-13T02:41:51Z",
+                "message": "containers with unready status: [sise]",
+                "reason": "ContainersNotReady",
+                "status": "False",
+                "type": "ContainersReady"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2023-07-13T02:41:51Z",
+                "status": "True",
+                "type": "PodScheduled"
+            }
+        ],
+        "containerStatuses": [
+            {
+                "containerID": "containerd://87df90eb807f7bb3c9f3c70b775439331d2672cc2089183ad57777384a7c248d",
+                "image": "quay.io/openshiftlabs/simpleservice:0.5.0",
+                "imageID": "quay.io/openshiftlabs/simpleservice@sha256:72bfe1acc54829c306dd6683fe28089d222cf50a2df9d10c4e9d32974a591673",
+                "lastState": {},
+                "name": "sise",
+                "ready": false,
+                "restartCount": 0,
+                "started": true,
+                "state": {
+                    "running": {
+                        "startedAt": "2023-07-13T02:41:52Z"
+                    }
+                }
+            }
+        ],
+        "hostIP": "172.18.0.2",
+        "phase": "Running",
+        "podIP": "10.244.0.13",
+        "podIPs": [
+            {
+                "ip": "10.244.0.13"
+            }
+        ],
+        "qosClass": "BestEffort",
+        "startTime": "2023-07-13T02:41:51Z"
+    }
+}

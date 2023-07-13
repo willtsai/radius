@@ -12,6 +12,26 @@ resource env 'Applications.Core/environments@2022-03-15-privatepreview' = {
       resourceId: 'self'
       namespace: 'corerp-environment-recipes-env'
     }
+    extensions: {
+      'contoso.com/applicationInsights': {
+        instrumentationKey: '00000000-0000-0000-0000-000000000000'
+      }
+    }
+    // Registering and enabling the extensions that can be used.
+    supportedExtensions: {
+      'dapr.io/Sidecar': {
+        templatePath: '.....'
+        type: 'jsonnet'
+        appliesTo: [{
+          resource: 'Applications.Core/containers'
+          outputTypes: 'Kubernetes Deployment'
+        }]
+      }
+      'contoso.com/SchedulingPolicy': {
+        templatePath: '.....'
+        type: 'jsonnet'
+      }
+    }
     recipes: {
       'Applications.Link/daprStateStores': {
         default: {

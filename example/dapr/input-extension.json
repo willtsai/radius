@@ -1,0 +1,5 @@
+{
+    "kind": "dapr.io/sidecar",
+    "appId": "nodeapp",
+    "appPort": 3000
+}

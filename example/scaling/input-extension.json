@@ -1,0 +1,7 @@
+{
+    "_comment": "Supports multiple types of scheduling behaviors: `spread` or `default`",
+
+    
+    "kind": "contoso.com/schedulingBehavior",
+    "behavior": "spread"
+}
