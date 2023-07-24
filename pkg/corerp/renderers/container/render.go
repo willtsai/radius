@@ -60,12 +60,16 @@ const (
 	AzureKeyVaultCryptoUserRole  = "Key Vault Crypto User"
 
 	defaultServiceAccountName = "default"
+	HTTP_SCHEME = "http"
+	HTTPS_SCHEME = "https"
+	HTTPS_PORT = 443
 )
 
 // this flag is used to indicate whether or not this resource uses DNS-SD to enable resource connections.
-// this flag is triggered when a container has a 'source' field that is structured as a URL.
+// triggered when a container has a 'source' field that is structured as a URL.
 // note: this flag is not exclusive. 
-// It is possible for a resource to use DNS-SD and httproutes simultaneously,
+// this flag will be removed along with HTTProute functionality once DNS-SD is fully implemented.
+// It is currently possible for a resource to use DNS-SD and httproutes simultaneously,
 // but not in the same connections object.
 var usesDNSSD = false
 
@@ -115,7 +119,7 @@ func (r Renderer) GetDependencyIDs(ctx context.Context, dm v1.DataModelInterface
 			resourceID, err := resources.ParseResource(connection.Source)
 
 			if err != nil {
-				return nil, nil, v1.NewClientErrInvalidRequest(err.Error())
+				return nil, nil, v1.NewClientErrInvalidRequest(fmt.Sprintf("invalid source: %s. Must be either a URL or a valid resourceID", connection.Source))
 			}
 	
 			// Non-radius Azure connections that are accessible from Radius container resource.
@@ -269,11 +273,11 @@ func (r Renderer) generateServiceComputedValues(resource *datamodel.ContainerRes
 				portVal = port.Port
 			}
 
-			schemeVal := "http"
+			schemeVal := HTTP_SCHEME
 
 			// if the port is 443, use https as the default scheme.
-			if portVal == 443 {
-				schemeVal = "https"
+			if portVal == HTTPS_PORT {
+				schemeVal = HTTPS_SCHEME
 			}
 
 			// if the optional scheme value is set, use that instead of the default scheme.
