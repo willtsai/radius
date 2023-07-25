@@ -73,6 +73,10 @@ const (
 // but not in the same connections object.
 var usesDNSSD = false
 
+// this flag is used to indicate whether or not this resource needs a service to be generated.
+// this flag is triggered when a container has an exposed port(s), but no 'provides' field.
+var needsServiceGeneration = false
+
 // GetSupportedKinds returns a list of supported volume kinds
 func GetSupportedKinds() []string {
 	keys := []string{}
@@ -126,6 +130,12 @@ func (r Renderer) GetDependencyIDs(ctx context.Context, dm v1.DataModelInterface
 	}
 
 	for _, port := range properties.Container.Ports {
+		// if the container has an exposed port, note that down.
+		// A single service will be generated for a container with one or more exposed ports.
+		if port.ContainerPort != 0 && port.Provides == ""{
+			needsServiceGeneration = true
+		}
+
 		provides := port.Provides
 
 		// if provides is empty, skip this port. A service for this port will be generated later on.
@@ -219,7 +229,7 @@ func (r Renderer) Render(ctx context.Context, dm v1.DataModelInterface, options 
 	}
 
 	// If the container has an exposed port and uses DNS-SD, generate a service for it.
-	if usesDNSSD && len(properties.Container.Ports) > 0 {
+	if needsServiceGeneration {
 		// generate computed values for the service.
 		serviceComputedValues, containerPortValues, containerPortNames, err := r.generateServiceComputedValues(resource)
 		if err != nil {
@@ -238,6 +248,8 @@ func (r Renderer) Render(ctx context.Context, dm v1.DataModelInterface, options 
 		for k, v := range serviceComputedValues {
 			computedValues[k] = v
 		}
+
+		needsServiceGeneration = false
 	}
 
 	return renderers.RendererOutput{
