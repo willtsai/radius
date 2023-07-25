@@ -60,9 +60,9 @@ const (
 	AzureKeyVaultCryptoUserRole  = "Key Vault Crypto User"
 
 	defaultServiceAccountName = "default"
-	HTTP_SCHEME = "http"
-	HTTPS_SCHEME = "https"
-	HTTPS_PORT = 443
+	httpScheme = "http"
+	httpsScheme = "https"
+	httpsPort = 443
 )
 
 // this flag is used to indicate whether or not this resource uses DNS-SD to enable resource connections.
@@ -72,10 +72,6 @@ const (
 // It is currently possible for a resource to use DNS-SD and httproutes simultaneously,
 // but not in the same connections object.
 var usesDNSSD = false
-
-// this flag is used to indicate whether or not this resource needs a service to be generated.
-// this flag is triggered when a container has an exposed port(s), but no 'provides' field.
-var needsServiceGeneration = false
 
 // GetSupportedKinds returns a list of supported volume kinds
 func GetSupportedKinds() []string {
@@ -103,19 +99,13 @@ func (r Renderer) GetDependencyIDs(ctx context.Context, dm v1.DataModelInterface
 	//
 	// Anywhere we accept a resource ID in the model should have its value returned from here
 	for _, connection := range properties.Connections {
-		if (connection.Source == "") {
-			// todo: Throw an error here.
-			// A user should not create a connection without a source.
-			continue
-		}
 
 		// if source is a URL (example: 'http://containerx:3000'), use DNS-SD.
 		if (isURL(connection.Source)) {
 			usesDNSSD = true
-		}
-
-		// If source is not a URL and not empty, it must be a resource ID (example: containerhttproute.id). So, we use httproutes.
-		if (!isURL(connection.Source) && connection.Source != "") {
+		} else {
+			// If source is not a URL, it must be either resource ID, invalid string, or empty (example: containerhttproute.id). So, we use httproutes.
+			// All of these cases are handled by resources.ParseResource(). 
 			resourceID, err := resources.ParseResource(connection.Source)
 
 			if err != nil {
@@ -136,15 +126,16 @@ func (r Renderer) GetDependencyIDs(ctx context.Context, dm v1.DataModelInterface
 	}
 
 	for _, port := range properties.Container.Ports {
-		// if the container has an exposed port, note that down.
-		// A single service will be generated for a container with one or more exposed ports.
-		if port.ContainerPort != 0 && port.Provides == ""{
-			needsServiceGeneration = true
-		}
-
 		provides := port.Provides
+
+		// if provides is empty, skip this port. A service for this port will be generated later on.
 		if provides == "" {
 			continue
+		}
+
+		// ensure that users cannot use DNS-SD and httproutes simultaneously.
+		if provides != "" && usesDNSSD {
+			return nil, nil, v1.NewClientErrInvalidRequest(fmt.Sprintf("cannot use DNS-SD and httproutes simultaneously. Please use one or the other."))
 		}
 
 		resourceID, err := resources.ParseResource(provides)
@@ -227,7 +218,8 @@ func (r Renderer) Render(ctx context.Context, dm v1.DataModelInterface, options 
 		outputResources = append(outputResources, r.makeSecret(ctx, *resource, appId.Name(), secretData, options))
 	}
 
-	if needsServiceGeneration {
+	// If the container has an exposed port and uses DNS-SD, generate a service for it.
+	if usesDNSSD && len(properties.Container.Ports) > 0 {
 		// generate computed values for the service.
 		serviceComputedValues, containerPortValues, containerPortNames, err := r.generateServiceComputedValues(resource)
 		if err != nil {
@@ -246,8 +238,6 @@ func (r Renderer) Render(ctx context.Context, dm v1.DataModelInterface, options 
 		for k, v := range serviceComputedValues {
 			computedValues[k] = v
 		}
-
-		needsServiceGeneration = false
 	}
 
 	return renderers.RendererOutput{
@@ -273,11 +263,11 @@ func (r Renderer) generateServiceComputedValues(resource *datamodel.ContainerRes
 				portVal = port.Port
 			}
 
-			schemeVal := HTTP_SCHEME
+			schemeVal := httpScheme
 
 			// if the port is 443, use https as the default scheme.
-			if portVal == HTTPS_PORT {
-				schemeVal = HTTPS_SCHEME
+			if portVal == httpsPort {
+				schemeVal = httpsScheme
 			}
 
 			// if the optional scheme value is set, use that instead of the default scheme.
@@ -975,7 +965,7 @@ func isURL(input string) bool {
 	_, err := url.ParseRequestURI(input)
 	
 	// if first character is a slash, it's not a URL. It's a path.
-	if (err != nil || input[0] == '/') {
+	if (input == "" || err != nil || input[0] == '/') {
 		return false
 	}
 	return true
