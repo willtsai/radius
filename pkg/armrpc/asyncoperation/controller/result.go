@@ -61,6 +61,9 @@ func (r *Result) SetFailed(err v1.ErrorDetails, requeue bool) {
 		Code:    err.Code,
 		Message: err.Message,
 	}
+	if err.Details != nil {
+		r.Error.Details = err.Details
+	}
 }
 
 // # Function Explanation

@@ -23,6 +23,7 @@ import (
 
 	dockerParser "github.com/novln/docker-parser"
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
+	"github.com/project-radius/radius/pkg/recipes"
 	"oras.land/oras-go/v2/content"
 	"oras.land/oras-go/v2/registry/remote"
 )
@@ -60,7 +61,7 @@ func ReadFromRegistry(ctx context.Context, path string, data *map[string]any) er
 		return err
 	}
 
-	return nil
+	return recipes.NewRecipeError(recipes.RecipeLanguageFailure, "some error", nil)
 }
 
 // getDigestFromManifest gets the layers digest from the manifest

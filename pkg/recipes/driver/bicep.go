@@ -77,8 +77,9 @@ func (d *bicepDriver) Execute(ctx context.Context, configuration recipes.Configu
 
 	recipeData := make(map[string]any)
 	err := util.ReadFromRegistry(ctx, definition.TemplatePath, &recipeData)
+	test := err.(*recipes.RecipeError)
 	if err != nil {
-		return nil, err
+		return nil, recipes.NewRecipeError(recipes.RecipeDownloadFailed, "recipe download failed", &test.ErrorDetails)
 	}
 	// create the context object to be passed to the recipe deployment
 	recipeContext, err := recipecontext.New(&recipe, &configuration)
