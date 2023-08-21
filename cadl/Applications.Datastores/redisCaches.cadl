@@ -31,7 +31,10 @@ using Cadl.Versioning;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Radius;
 using OpenAPI;
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 namespace Applications.Datastores;
 @doc("Redis cache portable resource")
 model RedisCacheResource

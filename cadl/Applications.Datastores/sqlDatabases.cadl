@@ -31,7 +31,10 @@ using Cadl.Versioning;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Radius;
 using OpenAPI;
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 namespace Applications.Datastores;
 @doc("Sql database properties")
 model SqlDatabaseProperties extends BasicResourceProperties {
@@ -39,8 +42,11 @@ model SqlDatabaseProperties extends BasicResourceProperties {
   @visibility("read")
   provisioningState?: ProvisioningState;
 
+<<<<<<< Updated upstream
   @doc("The name of the SQL database.")
   database?: string;
+=======
+>>>>>>> Stashed changes
 
   @doc("The fully qualified domain name of the target SQL database.")
   server?: string;
