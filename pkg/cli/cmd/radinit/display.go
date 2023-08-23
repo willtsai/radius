@@ -57,8 +57,8 @@ const (
 
 var (
 	progressSpinner = spinner.Spinner{
-		Frames: []string{"🕐 ", "🕑 ", "🕒 ", "🕓 ", "🕔 ", "🕕 ", "🕖 ", "🕗 ", "🕘 ", "🕙 ", "🕚 ", "🕛 "},
-		FPS:    time.Second / 4,
+		Frames: []string{"⠇ ", "⠏ ", "⠋ ", "⠛ ", "⠙ ", "⠹ ", "⠸ ", "⠼ ", "⠴ ", "⠶ ", "⠦ ", "⠧ "},
+		FPS:    time.Second / 8,
 	}
 
 	foregroundBrightStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#111111", Dark: "#EEEEEE"}).Bold(true)
