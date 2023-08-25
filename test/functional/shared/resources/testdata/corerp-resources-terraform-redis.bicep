@@ -10,18 +10,18 @@ param redisCacheName string
 param appName string
 
 resource env 'Applications.Core/environments@2022-03-15-privatepreview' = {
-  name: 'corerp-resources-terraform-redis-env'
+  name: 'corerp-resources-terraform-redis-env5'
   properties: {
     compute: {
       kind: 'kubernetes'
       resourceId: 'self'
-      namespace: 'corerp-resources-terraform-redis-env'
+      namespace: 'corerp-resources-terraform-redis-env5'
     }
     recipes: {
       'Applications.Core/extenders': {
         default: {
           templateKind: 'terraform'
-          templatePath: '${moduleServer}/kubernetes-redis.zip'
+          templatePath: 'http://localhost:8000/kubernetes-redis.zip'
         }
       }
     }
@@ -42,7 +42,7 @@ resource app 'Applications.Core/applications@2022-03-15-privatepreview' = {
 }
 
 resource webapp 'Applications.Core/extenders@2022-03-15-privatepreview' = {
-  name: 'corerp-resources-terraform-redis'
+  name: 'corerp-resources-terraform-redis5'
   properties: {
     application: app.id
     environment: env.id

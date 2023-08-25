@@ -51,11 +51,11 @@ import (
 // - The recipe deployment creates a Kubernetes deployment and a Kubernetes service.
 func Test_TerraformRecipe_KubernetesRedis(t *testing.T) {
 	template := "testdata/corerp-resources-terraform-redis.bicep"
-	name := "corerp-resources-terraform-redis"
-	appName := "corerp-resources-terraform-redis-app"
-	envName := "corerp-resources-terraform-redis-env"
-	redisCacheName := "tf-redis-cache"
-	secret, err := getSecretSuffix("/planes/radius/local/resourcegroups/default/providers/Applications.Link/extenders/"+name, envName, appName)
+	name := "corerp-resources-terraform-redis5"
+	appName := "corerp-resources-terraform-redis-app5"
+	envName := "corerp-resources-terraform-redis-env5"
+	redisCacheName := "tf-redis-cache5"
+	secret, err := getSecretSuffix("/planes/radius/local/resourcegroups/default/providers/Applications.Core/extenders/"+name, envName, appName)
 	require.NoError(t, err)
 	test := shared.NewRPTest(t, name, []shared.TestStep{
 		{
@@ -89,7 +89,7 @@ func Test_TerraformRecipe_KubernetesRedis(t *testing.T) {
 				},
 			},
 			PostStepVerify: func(ctx context.Context, t *testing.T, test shared.RPTest) {
-				resourceID := "/planes/radius/local/resourcegroups/default/providers/Applications.Link/extenders/" + name
+				resourceID := "/planes/radius/local/resourcegroups/default/providers/Applications.Core/extenders/" + name
 				testSecretDeletion(t, ctx, test, appName, envName, resourceID)
 			},
 		},
@@ -101,7 +101,7 @@ func Test_TerraformRecipe_Context(t *testing.T) {
 	template := "testdata/corerp-resources-terraform-context.bicep"
 	name := "corerp-resources-terraform-context"
 	appNamespace := "corerp-resources-terraform-context-app"
-	secret, err := getSecretSuffix("/planes/radius/local/resourcegroups/default/providers/Applications.Link/extenders/"+name, name, name)
+	secret, err := getSecretSuffix("/planes/radius/local/resourcegroups/default/providers/Applications.Core/extenders/"+name, name, name)
 	require.NoError(t, err)
 	test := shared.NewRPTest(t, name, []shared.TestStep{
 		{
