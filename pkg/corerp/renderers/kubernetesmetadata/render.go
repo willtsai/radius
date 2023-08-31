@@ -72,6 +72,10 @@ func (r *Renderer) Render(ctx context.Context, dm v1.DataModelInterface, options
 			continue
 		}
 
+		if ores.CreateResource == nil {
+			continue
+		}
+
 		dep, ok := ores.CreateResource.Data.(*appsv1.Deployment)
 		if !ok {
 			continue

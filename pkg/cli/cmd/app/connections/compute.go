@@ -19,6 +19,7 @@ package connections
 import (
 	"encoding/json"
 	"sort"
+	"strings"
 
 	"github.com/go-openapi/jsonpointer"
 	"github.com/radius-project/radius/pkg/cli/clients_new/generated"
@@ -56,11 +57,11 @@ func compute(applicationName string, applicationResources []generated.GenericRes
 		resources = append(resources, resource)
 
 		// Application-scoped resources are by definition "in" the application
-		resourcesByIDInApplication[*resource.ID] = true
+		resourcesByIDInApplication[strings.ToLower(*resource.ID)] = true
 	}
 
 	for _, resource := range environmentResources {
-		_, found := resourcesByIDInApplication[*resource.ID]
+		_, found := resourcesByIDInApplication[strings.ToLower(*resource.ID)]
 		if found {
 			// Appears in both application and environment lists, avoid duplicates.
 			continue
@@ -69,7 +70,7 @@ func compute(applicationName string, applicationResources []generated.GenericRes
 		// This is an environment-scoped resource. We need to process the connections
 		// to determine if it's part of the application.
 		resources = append(resources, resource)
-		resourcesByIDInApplication[*resource.ID] = false
+		resourcesByIDInApplication[strings.ToLower(*resource.ID)] = false
 	}
 
 	// Next we need to process each entry in the resources list and build up the application graph.
@@ -79,7 +80,7 @@ func compute(applicationName string, applicationResources []generated.GenericRes
 		entry.Connections = connectionsFromAPIData(resource)
 		entry.Resources = outputResourcesFromAPIData(resource)
 
-		resourceEntriesByID[*resource.ID] = entry
+		resourceEntriesByID[strings.ToLower(*resource.ID)] = entry
 	}
 
 	// Now we've massaged the data into a format we like, but we still don't have a comprehensive list
@@ -104,7 +105,7 @@ func compute(applicationName string, applicationResources []generated.GenericRes
 	// First process add resources we *know* are in the application to the queue. As we explore the graph we'll
 	// visit resources outside the application if necessary.
 	for _, entry := range resourceEntriesByID {
-		if resourcesByIDInApplication[entry.ID] {
+		if resourcesByIDInApplication[strings.ToLower(entry.ID)] {
 			queue = append(queue, entry.ID)
 		}
 	}
@@ -113,7 +114,7 @@ func compute(applicationName string, applicationResources []generated.GenericRes
 		// Pop!
 		id := queue[0]
 		queue = queue[1:]
-		entry := resourceEntriesByID[id]
+		entry := resourceEntriesByID[strings.ToLower(id)]
 
 		for _, connection := range entry.Connections {
 			destination := connection.To
@@ -125,7 +126,7 @@ func compute(applicationName string, applicationResources []generated.GenericRes
 
 			// For each connection let's make sure the destination is also part of the application graph. This handles
 			// The two cases mentioned above.
-			inApplication, found := resourcesByIDInApplication[destination.ID]
+			inApplication, found := resourcesByIDInApplication[strings.ToLower(destination.ID)]
 			if !found {
 				// Case 1) This is a cloud resource that is referenced by an application-scoped resource.
 				//
@@ -133,8 +134,8 @@ func compute(applicationName string, applicationResources []generated.GenericRes
 				//
 				// Since this is a cloud resource we need to create a new entry in 'resourceEntriesByID'.
 				queue = append(queue, destination.ID)
-				resourceEntriesByID[destination.ID] = resourceEntryFromID(destination.ID)
-				resourcesByIDInApplication[destination.ID] = true
+				resourceEntriesByID[strings.ToLower(destination.ID)] = resourceEntryFromID(destination.ID)
+				resourcesByIDInApplication[strings.ToLower(destination.ID)] = true
 
 			}
 			if !inApplication {
@@ -147,12 +148,12 @@ func compute(applicationName string, applicationResources []generated.GenericRes
 				//
 				// Since this is an environment-scoped resource it should already have an entry in 'resourceEntriesByID'.
 				queue = append(queue, destination.ID)
-				resourcesByIDInApplication[destination.ID] = true
+				resourcesByIDInApplication[strings.ToLower(destination.ID)] = true
 			}
 
 			// Note the connection in both directions.
-			connectionsBySource[connection.From.ID] = append(connectionsBySource[connection.From.ID], connection)
-			connectionsByDestination[connection.To.ID] = append(connectionsByDestination[connection.To.ID], connection)
+			connectionsBySource[strings.ToLower(connection.From.ID)] = append(connectionsBySource[strings.ToLower(connection.From.ID)], connection)
+			connectionsByDestination[strings.ToLower(connection.To.ID)] = append(connectionsByDestination[strings.ToLower(connection.To.ID)], connection)
 		}
 	}
 
@@ -165,8 +166,8 @@ func compute(applicationName string, applicationResources []generated.GenericRes
 
 		// We have one job left to do, which is to update the inbound connections. The outbound connections
 		// were already done.
-		entry := resourceEntriesByID[id]
-		connectionsIn := connectionsByDestination[id]
+		entry := resourceEntriesByID[strings.ToLower(id)]
+		connectionsIn := connectionsByDestination[strings.ToLower(id)]
 		entry.Connections = append(entry.Connections, connectionsIn...)
 
 		// Print connections in stable order.
@@ -175,7 +176,7 @@ func compute(applicationName string, applicationResources []generated.GenericRes
 			return entry.Connections[i].Name < entry.Connections[j].Name
 		})
 
-		graph.Resources[id] = entry
+		graph.Resources[strings.ToLower(id)] = entry
 	}
 
 	return &graph

@@ -133,8 +133,10 @@ func (src *ContainerResource) ConvertTo() (v1.DataModelInterface, error) {
 				Args:            stringSlice(src.Properties.Container.Args),
 				WorkingDir:      to.String(src.Properties.Container.WorkingDir),
 			},
-			Extensions: extensions,
-			Runtimes:   toRuntimeProperties(src.Properties.Runtimes),
+			Extensions:           extensions,
+			Runtimes:             toRuntimeProperties(src.Properties.Runtimes),
+			ResourceProvisioning: toResourceProvisioning(src.Properties.ResourceProvisioning),
+			Resources:            toResources(src.Properties.Resources),
 		},
 	}
 
@@ -258,9 +260,11 @@ func (dst *ContainerResource) ConvertFrom(src v1.DataModelInterface) error {
 			Args:            to.SliceOfPtrs(c.Properties.Container.Args...),
 			WorkingDir:      to.Ptr(c.Properties.Container.WorkingDir),
 		},
-		Extensions: extensions,
-		Identity:   identity,
-		Runtimes:   fromRuntimeProperties(c.Properties.Runtimes),
+		Extensions:           extensions,
+		Identity:             identity,
+		Runtimes:             fromRuntimeProperties(c.Properties.Runtimes),
+		Resources:            fromResources(c.Properties.Resources),
+		ResourceProvisioning: fromResourceProvisioning(c.Properties.ResourceProvisioning),
 	}
 
 	return nil
@@ -546,6 +550,41 @@ func fromRuntimeProperties(runtime *datamodel.RuntimeProperties) *RuntimesProper
 		}
 	}
 	return r
+}
+
+func toResources(r []*ResourceReference) []datamodel.ResourceReference {
+	result := []datamodel.ResourceReference{}
+	for _, rr := range r {
+		result = append(result, datamodel.ResourceReference{ID: to.String(rr.ID)})
+	}
+
+	return result
+}
+
+func fromResources(r []datamodel.ResourceReference) []*ResourceReference {
+	result := []*ResourceReference{}
+	for _, rr := range r {
+		result = append(result, &ResourceReference{ID: to.Ptr(rr.ID)})
+	}
+
+	return result
+}
+
+func toResourceProvisioning(r *ResourceProvisioning) *string {
+	if r == nil {
+		return nil
+	}
+
+	return to.Ptr(string(*r))
+}
+
+func fromResourceProvisioning(r *string) *ResourceProvisioning {
+	if r == nil {
+		return nil
+	}
+
+	val := ResourceProvisioning(*r)
+	return &val
 }
 
 func toPermissionDataModel(rbac *VolumePermission) datamodel.VolumePermission {

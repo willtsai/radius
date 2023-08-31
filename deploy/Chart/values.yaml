@@ -9,6 +9,14 @@ global:
   # zipkin:
   #   url: "http://jaeger-collector.radius-monitoring.svc.cluster.local:9411/api/v2/spans"
   #
+controller:
+  image: rynowak.azurecr.io/controller
+  tag: kubernetes-private
+  resources:
+    requests:
+      memory: "60Mi"
+    limits:
+      memory: "300Mi"
 
 de:
   image: radius.azurecr.io/deployment-engine
@@ -22,7 +30,8 @@ de:
       memory: "300Mi"
 
 ucp:
-  image: radius.azurecr.io/ucpd
+  image: rynowak.azurecr.io/ucpd
+  tag: kubernetes-private
   # Default tag uses Chart AppVersion.
   # tag: latest
   resources:
@@ -33,9 +42,8 @@ ucp:
       memory: "300Mi"
 
 rp:
-  image: radius.azurecr.io/applications-rp
-  # Default tag uses Chart AppVersion.
-  # tag: latest
+  image: rynowak.azurecr.io/applications-rp
+  tag: kubernetes-private
   publicEndpointOverride: ""
   resources:
     requests:

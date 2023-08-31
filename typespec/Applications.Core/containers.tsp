@@ -62,6 +62,12 @@ model ContainerProperties {
   @extension("x-ms-identifiers", [])
   extensions?: Extension[];
 
+  @doc("Specifies how the underlying service/resource is provisioned and managed.")
+  resourceProvisioning?: ResourceProvisioning;
+
+  @doc("A collection of references to resources associated with the container")
+  resources?: ResourceReference[];
+
   @doc("Specifies Runtime-specific functionality")
   runtimes?: RuntimesProperties;
 }

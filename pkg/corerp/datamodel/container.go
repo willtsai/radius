@@ -71,11 +71,13 @@ func (conn ConnectionProperties) GetDisableDefaultEnvVars() bool {
 // ContainerProperties represents the properties of Container.
 type ContainerProperties struct {
 	rpv1.BasicResourceProperties
-	Connections map[string]ConnectionProperties `json:"connections,omitempty"`
-	Container   Container                       `json:"container,omitempty"`
-	Extensions  []Extension                     `json:"extensions,omitempty"`
-	Identity    *rpv1.IdentitySettings          `json:"identity,omitempty"`
-	Runtimes    *RuntimeProperties              `json:"runtimes,omitempty"`
+	Connections          map[string]ConnectionProperties `json:"connections,omitempty"`
+	Container            Container                       `json:"container,omitempty"`
+	Extensions           []Extension                     `json:"extensions,omitempty"`
+	Identity             *rpv1.IdentitySettings          `json:"identity,omitempty"`
+	Runtimes             *RuntimeProperties              `json:"runtimes,omitempty"`
+	Resources            []ResourceReference             `json:"resources,omitempty"`
+	ResourceProvisioning *string                         `json:"resourceProvisioning,omitempty"`
 }
 
 // KubernetesRuntime represents the Kubernetes runtime configuration.
@@ -132,6 +134,10 @@ const (
 	ProtocolTCP  Protocol = "TCP"
 	ProtocolUDP  Protocol = "UDP"
 )
+
+type ResourceReference struct {
+	ID string `json:"id,omitempty"`
+}
 
 type VolumeKind string
 

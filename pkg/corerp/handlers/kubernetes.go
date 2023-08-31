@@ -78,6 +78,10 @@ type kubernetesHandler struct {
 // deployment, it also waits until the deployment is ready.
 func (handler *kubernetesHandler) Put(ctx context.Context, options *PutOptions) (map[string]string, error) {
 	logger := ucplog.FromContextOrDiscard(ctx)
+	if options.Resource.CreateResource == nil {
+		return map[string]string{}, nil
+	}
+
 	item, err := convertToUnstructured(*options.Resource)
 	if err != nil {
 		return nil, err

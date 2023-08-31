@@ -2950,6 +2950,17 @@
           },
           "x-ms-identifiers": []
         },
+        "resourceProvisioning": {
+          "$ref": "#/definitions/ResourceProvisioning",
+          "description": "Specifies how the underlying service/resource is provisioned and managed."
+        },
+        "resources": {
+          "type": "array",
+          "description": "A collection of references to resources associated with the container",
+          "items": {
+            "$ref": "#/definitions/ResourceReference"
+          }
+        },
         "runtimes": {
           "$ref": "#/definitions/RuntimesProperties",
           "description": "Specifies Runtime-specific functionality"
@@ -3052,6 +3063,17 @@
             "$ref": "#/definitions/Extension"
           },
           "x-ms-identifiers": []
+        },
+        "resourceProvisioning": {
+          "$ref": "#/definitions/ResourceProvisioning",
+          "description": "Specifies how the underlying service/resource is provisioned and managed."
+        },
+        "resources": {
+          "type": "array",
+          "description": "A collection of references to resources associated with the container",
+          "items": {
+            "$ref": "#/definitions/ResourceReference"
+          }
         },
         "runtimes": {
           "$ref": "#/definitions/RuntimesProperties",
@@ -4587,6 +4609,19 @@
           }
         ]
       }
+    },
+    "ResourceReference": {
+      "type": "object",
+      "description": "Describes a reference to an existing resource",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Resource id of an existing resource"
+        }
+      },
+      "required": [
+        "id"
+      ]
     },
     "ResourceStatus": {
       "type": "object",
