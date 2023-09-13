@@ -9,6 +9,7 @@ wget -q https://raw.githubusercontent.com/dapr/cli/master/install/install.sh -O 
 
 ## Clone samples repo
 git clone https://github.com/radius-project/samples.git /workspaces/samples
+git clone https://github.com/radius-project/bicep.git /workspaces/bicep
 
 ## Build Radius and copy to /usr/local/bin
 make build
