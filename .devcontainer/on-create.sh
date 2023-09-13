@@ -12,4 +12,4 @@ git clone https://github.com/radius-project/samples.git /workspace/samples
 
 ## Build Radius and copy to /usr/local/bin
 make build
-cp dist/linux_amd64/release/rad /usr/local/bin/
+sudo cp dist/linux_amd64/release/rad /usr/local/bin/
