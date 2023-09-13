@@ -1,0 +1,56 @@
+{
+	"name": "Radius Dev Container",
+	"image": "mcr.microsoft.com/devcontainers/universal:linux",
+	"workspaceFolder": "/workspaces/radius-project",
+	"onCreateCommand": "bash ./.devcontainer/on-create.sh",
+	"runArgs": [
+	  "--privileged",
+	  "--init"
+	],
+	// Features to add to the dev container. More info: https://containers.dev/features
+	"features": {
+	  "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+	  "ghcr.io/devcontainers/features/azure-cli:1": {},
+	  "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {},
+	  "ghcr.io/rio/features/k3d:1": {}
+	},
+	// Configure tool-specific properties.
+	"customizations": {
+	  // Configure properties specific to VS Code.
+	  "vscode": {
+		"settings": {},
+		"extensions": [
+			"ms-azuretools.vscode-dapr",
+			"ms-azuretools.vscode-docker",
+			"GitHub.copilot"
+		]
+	  },
+      "codespaces": {
+        "repositories": {
+            "radius-project/samples": {
+                "permissions": {
+                    "contents": "read",
+                    "packages": "read"
+                }
+            },
+            "radius-project/bicep": {
+                "permissions": {
+                    "contents": "read",
+                    "packages": "read"
+                }
+            }
+        }
+      }
+	},
+	"remoteEnv": {
+	  "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
+	},
+	// Use 'portsAttributes' to set default properties for specific forwarded ports.
+	// More info: https://containers.dev/implementors/json_reference/#port-attributes
+	"portsAttributes": {
+	  "8081": {
+		"label": "k3s",
+		"onAutoForward": "silent"
+	  }
+	}
+  }
