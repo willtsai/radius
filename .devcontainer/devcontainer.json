@@ -1,7 +1,7 @@
 {
 	"name": "Radius Dev Container",
 	"image": "mcr.microsoft.com/devcontainers/universal:linux",
-	"workspaceFolder": "/workspaces/radius-project",
+	"workspaceFolder": "/workspaces/radius",
 	"onCreateCommand": "bash ./.devcontainer/on-create.sh",
 	"runArgs": [
 	  "--privileged",
