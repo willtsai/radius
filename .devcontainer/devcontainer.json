@@ -22,7 +22,8 @@
 		"extensions": [
 			"ms-azuretools.vscode-dapr",
 			"ms-azuretools.vscode-docker",
-			"GitHub.copilot"
+			"GitHub.copilot",
+			"ms-vscode.makefile-tools"
 		]
 	  },
       "codespaces": {
