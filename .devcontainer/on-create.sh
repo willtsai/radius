@@ -8,7 +8,7 @@ k3d cluster create -p '8081:80@loadbalancer' --k3s-arg '--disable=traefik@server
 wget -q https://raw.githubusercontent.com/dapr/cli/master/install/install.sh -O - | /bin/bash
 
 ## Clone samples repo
-git clone https://github.com/radius-project/samples.git /workspace/samples
+git clone https://github.com/radius-project/samples.git /workspaces/samples
 
 ## Build Radius and copy to /usr/local/bin
 make build
