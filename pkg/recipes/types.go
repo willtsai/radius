@@ -17,9 +17,12 @@ limitations under the License.
 package recipes
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 
 	"github.com/project-radius/radius/pkg/corerp/datamodel"
+	"github.com/project-radius/radius/pkg/resourcemodel"
 )
 
 // Configuration represents kubernetes runtime and cloud provider configuration, which is used by the driver while deploying recipes.
@@ -73,19 +76,12 @@ type ResourceMetadata struct {
 	Parameters map[string]any
 }
 
-// RecipeOutput represents recipe deployment output.
-type RecipeOutput struct {
-	// Resources represents the list of output resources deployed recipe.
-	Resources []string
-	// Secrets represents the key/value pairs of secret values of the deployed resource.
-	Secrets map[string]any
-	// Values represents the key/value pairs of properties of the deployed resource.
-	Values map[string]any
-}
-
 const (
 	TemplateKindBicep     = "bicep"
 	TemplateKindTerraform = "terraform"
+
+	// Recipe outputs are expected to be wrapped under an object named
+	ResultPropertyName = "result"
 )
 
 var (
@@ -98,8 +94,80 @@ type ErrRecipeNotFound struct {
 }
 
 // # Function Explanation
-// 
+//
 // ErrRecipeNotFoundError returns an error message with the recipe name and environment when a recipe is not found.
 func (e *ErrRecipeNotFound) Error() string {
 	return fmt.Sprintf("could not find recipe %q in environment %q", e.Name, e.Environment)
 }
+
+// RecipeOutput represents recipe deployment output.
+type RecipeOutput struct {
+	// Resources represents the list of output resources deployed recipe.
+	Resources []string
+
+	// ResourcesNew represents the list of resource ids and resource types of the output resources deployed by the recipe.
+	ResoucesNew []RecipeResource
+
+	// Secrets represents the key/value pairs of secret values of the deployed resource.
+	Secrets map[string]any
+
+	// Values represents the key/value pairs of properties of the deployed resource.
+	Values map[string]any
+}
+
+type RecipeResource struct {
+	// ID       string
+	Identity resourcemodel.ResourceIdentity
+	// Type     string
+}
+
+// PrepareRecipeOutput populates the recipe output from the recipe deployment output stored in the "result" object.
+// outputs map is the value of "result" output from the recipe deployment response.
+func (ro *RecipeOutput) PrepareRecipeResponse(resultValue map[string]any) error {
+	b, err := json.Marshal(&resultValue)
+	if err != nil {
+		return err
+	}
+
+	// Using a decoder to block unknown fields.
+	decoder := json.NewDecoder(bytes.NewBuffer(b))
+	decoder.DisallowUnknownFields()
+	err = decoder.Decode(ro)
+	if err != nil {
+		return err
+	}
+
+	// Make sure maps are non-nil (it's just friendly).
+	if ro.Secrets == nil {
+		ro.Secrets = map[string]any{}
+	}
+	if ro.Values == nil {
+		ro.Values = map[string]any{}
+	}
+
+	return nil
+}
+
+// GetOutputResourcesFromRecipe parses the output resources from a recipe and returns a slice of OutputResource objects,
+// returning an error if any of the resources are invalid.
+// func GetOutputResourcesFromRecipe(output *RecipeOutput) ([]rpv1.OutputResource, error) {
+// 	results := []rpv1.OutputResource{}
+// 	for i, resource := range output.Resources {
+// 		id, err := resources.ParseResource(resource)
+// 		if err != nil {
+// 			return nil, &ValidationError{Message: fmt.Sprintf("resource id %q returned by recipe is invalid", resource)}
+// 		}
+
+// 		identity := resourcemodel.FromUCPID(id, "")
+// 		result := rpv1.OutputResource{
+// 			LocalID:       fmt.Sprintf("RecipeResource%d", i), // The dependency sorting code requires unique LocalIDs
+// 			Identity:      identity,
+// 			ResourceType:  *identity.ResourceType,
+// 			RadiusManaged: to.Ptr(true),
+// 		}
+
+// 		results = append(results, result)
+// 	}
+
+// 	return results, nil
+// }
