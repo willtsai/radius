@@ -26,12 +26,10 @@ import (
 	"github.com/google/uuid"
 	v1 "github.com/project-radius/radius/pkg/armrpc/api/v1"
 	"github.com/project-radius/radius/pkg/recipes"
-	"github.com/project-radius/radius/pkg/resourcemodel"
 
 	"github.com/project-radius/radius/pkg/recipes/terraform"
 	rpv1 "github.com/project-radius/radius/pkg/rp/v1"
 	"github.com/project-radius/radius/pkg/sdk"
-	"github.com/project-radius/radius/pkg/ucp/resources"
 	ucp_provider "github.com/project-radius/radius/pkg/ucp/secret/provider"
 	"github.com/project-radius/radius/pkg/ucp/ucplog"
 	"github.com/project-radius/radius/pkg/ucp/util"
@@ -149,71 +147,35 @@ func (d *terraformDriver) prepareTFRecipeResponse(tfState *tfjson.State) (*recip
 		}
 	}
 
-	// process the 'resources' created by the template
+	// process the resources created by the template
 	deployedResources := d.getDeployedOutputResources(tfState.Values.RootModule)
-	recipeResponse.ResoucesNew = append(recipeResponse.ResoucesNew, deployedResources...)
-	// recipeResponse.Resources = append(recipeResponse.Resources, deployedResources...)
+	recipeResponse.Resources = append(recipeResponse.Resources, deployedResources...)
 
 	return recipeResponse, nil
 }
 
 // getDeployedOutputResources returns the list of IDs of the resources deployed by the Terraform module.
 // It traverses the module tree stored in the Terraform state and returns the list of resources that have
-// an 'id' attribute. Skips the resources created by the Kubernetes provider as the resource ID
-// is not in the format that Radius can parse.
-// func getDeployedOutputResources(module *tfjson.StateModule) []string {
-func (d *terraformDriver) getDeployedOutputResources(module *tfjson.StateModule) []recipes.RecipeResource {
-	// ids := []string{}
-	recipeResources := []recipes.RecipeResource{}
+// an 'id' attribute.
+func (d *terraformDriver) getDeployedOutputResources(module *tfjson.StateModule) []string {
+	ids := []string{}
 
 	if module == nil {
-		return recipeResources
-		// return ids
+		return ids
 	}
 
 	for _, resource := range module.Resources {
-		// Kubernetes resource id is not in the format that Radius can parse, so we skip it until we add support for it.
-		// if resource.ProviderName != "registry.terraform.io/hashicorp/kubernetes" {
 		if resource.AttributeValues != nil {
 			if id, ok := resource.AttributeValues["id"].(string); ok {
-				resourceIdentity := d.buildResourceIdentity(id, resource.Type, resource.ProviderName)
-				// ids = append(ids, id)
-				recipeResources = append(recipeResources, recipes.RecipeResource{Identity: resourceIdentity})
+				ids = append(ids, id)
 			}
 		}
-		// }
 	}
 
 	for _, childModule := range module.ChildModules {
-		modResources := d.getDeployedOutputResources(childModule)
-		recipeResources = append(recipeResources, modResources...)
-
-		// childIDs := getDeployedOutputResources(childModule)
-		// ids = append(ids, childIDs...)
+		childIDs := d.getDeployedOutputResources(childModule)
+		ids = append(ids, childIDs...)
 	}
 
-	return recipeResources
-	// return ids
-}
-
-func (d *terraformDriver) buildResourceIdentity(id, resourceType, providerName string) resourcemodel.ResourceIdentity {
-	parsedID, err := resources.ParseResource(id)
-	if err != nil {
-		// Log that the resource id can't be parsed, using resource type defined in terraform state
-	} else {
-		identity := resourcemodel.FromUCPID(parsedID, "")
-		resourceType = parsedID.Type()
-	}
-
-	resourceIdentity := resourcemodel.ResourceIdentity{
-		ResourceType: &resourcemodel.ResourceType{
-			Type:     resourceType,
-			Provider: providerName,
-		},
-		Data: map[string]any{
-			"id": id,
-		},
-	}
-
-	return resourceIdentity
+	return ids
 }
