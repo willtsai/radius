@@ -29,6 +29,7 @@ import (
 	"github.com/radius-project/radius/pkg/cli"
 	"github.com/radius-project/radius/pkg/cli/clients"
 	"github.com/radius-project/radius/pkg/cli/connections"
+	"github.com/radius-project/radius/pkg/cli/workspaces"
 	"github.com/radius-project/radius/pkg/sdk"
 	"github.com/radius-project/radius/pkg/ucp/aws"
 	"github.com/radius-project/radius/test"
@@ -81,6 +82,7 @@ func NewRPTestOptions(t *testing.T) RPTestOptions {
 
 	return RPTestOptions{
 		TestOptions:      test.NewTestOptions(t),
+		Workspace:        workspace,
 		CustomAction:     customAction,
 		ManagementClient: client,
 		AWSClient:        awsClient,
@@ -90,6 +92,9 @@ func NewRPTestOptions(t *testing.T) RPTestOptions {
 
 type RPTestOptions struct {
 	test.TestOptions
+
+	// Workspace is the configured workspace that is being used for tests.
+	Workspace        *workspaces.Workspace
 	CustomAction     *clientv2.CustomActionClient
 	ManagementClient clients.ApplicationsManagementClient
 	AWSClient        aws.AWSCloudControlClient
