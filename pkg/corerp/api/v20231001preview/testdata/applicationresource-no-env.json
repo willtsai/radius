@@ -1,0 +1,24 @@
+{
+  "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/radius-test-rg/providers/Applications.Core/applications/app0",
+  "name": "app0",
+  "type": "Applications.Core/applications",
+  "properties": {
+    "extensions": [
+      {
+        "kind": "kubernetesMetadata",
+        "annotations": {
+          "prometheus.io/scrape": "true",
+          "prometheus.io/port": "80"
+        },
+        "labels": {
+          "foo/bar/team": "credit",
+          "foo/bar/contact": "radiususer"
+        }
+      },
+      {
+        "kind": "kubernetesNamespace",
+        "namespace": "app0-ns"
+      }
+    ]
+  }
+}

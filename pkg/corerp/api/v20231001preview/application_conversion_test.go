@@ -48,6 +48,16 @@ func TestApplicationConvertVersionedToDataModel(t *testing.T) {
 			err:      nil,
 			emptyExt: true,
 		},
+		{
+			filename: "applicationresource-no-properties.json",
+			err:      &v1.ErrModelConversion{PropertyName: "$.properties", ValidValue: "not nil"},
+			emptyExt: true,
+		},
+		{
+			filename: "applicationresource-no-env.json",
+			err:      &v1.ErrModelConversion{PropertyName: "$.properties.environment", ValidValue: "not nil"},
+			emptyExt: true,
+		},
 	}
 
 	for _, tt := range conversionTests {

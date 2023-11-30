@@ -46,6 +46,9 @@ func ApplicationDataModelFromVersioned(content []byte, version string) (*datamod
 			return nil, err
 		}
 		dm, err := am.ConvertTo()
+		if err != nil {
+			return nil, err
+		}
 		return dm.(*datamodel.Application), err
 
 	default:

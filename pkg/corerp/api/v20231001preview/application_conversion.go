@@ -26,6 +26,15 @@ import (
 // ConvertTo converts from the versioned Application resource to version-agnostic datamodel.
 func (src *ApplicationResource) ConvertTo() (v1.DataModelInterface, error) {
 	// Note: SystemData conversion isn't required since this property comes ARM and datastore.
+
+	if src.Properties == nil {
+		return nil, &v1.ErrModelConversion{PropertyName: "$.properties", ValidValue: "not nil"}
+	}
+
+	if src.Properties.Environment == nil {
+		return nil, &v1.ErrModelConversion{PropertyName: "$.properties.environment", ValidValue: "not nil"}
+	}
+
 	converted := &datamodel.Application{
 		BaseResource: v1.BaseResource{
 			TrackedResource: v1.TrackedResource{
