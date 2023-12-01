@@ -141,7 +141,6 @@ downloadFile() {
         fi
     fi
 
-    ls -al $RADIUS_TMP_ROOT
     if [ ! -f "$ARTIFACT_TMP_FILE" ]; then
         echo "failed to download ${DOWNLOAD_URL}..."
         exit 1
