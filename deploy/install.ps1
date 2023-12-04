@@ -139,6 +139,8 @@ else {
     $asset = GetWindowsAsset -Release $release
     $assetName = $asset.name
     $exeFileUrl = $asset.url
+    Write-Output "Asset Name: ${assetName}"
+    Write-Output "exe URL: ${exeFileUrl}"
     $exeFilePath = $RadiusRoot + "\" + $assetName
 
     # Download rad CLI
