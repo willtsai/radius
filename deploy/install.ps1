@@ -119,9 +119,11 @@ if ($Version -eq "edge") {
         Exit 1
     }
 
-    $downloadURL = "ghcr.io/radius-project/rad/${OS}_${Arch}:latest"
+    $downloadURL = "ghcr.io/radius-project/rad/${OS}-${Arch}:latest"
     Write-Output "Downloading edge CLI from ${downloadURL}"
-    oras pull $DOWNLOAD_URL -o $RadiusRoot
+    oras pull $downloadURL -o $RadiusRoot
+    Write-Output "Asset Name: ${assetName}"
+    $exeFilePath = $RadiusRoot + "\" + $assetName
 }
 else {
     # Get the list of releases from GitHub
@@ -156,7 +158,7 @@ else {
 }
 
 if (!(Test-Path $exeFilePath -PathType Leaf)) {
-    throw "Failed to download rad Cli binary - $exeFilePath"
+    throw "Failed to download rad CLI binary - $exeFilePath"
 }
 
 # Remove old rad CLI if exists
