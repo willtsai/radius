@@ -25,7 +25,8 @@ $ErrorActionPreference = 'stop'
 # Constants
 $RadiusCliFileName = "rad.exe"
 $RadiusCliFilePath = "${RadiusRoot}\${RadiusCliFileName}"
-$OsArch = "windows-x64"
+$OS = "windows"
+$Arch = "amd64"
 $GitHubOrg = "radius-project"
 $GitHubRepo = "radius"
 $GitHubReleaseJsonUrl = "https://api.github.com/repos/${GitHubOrg}/${GitHubRepo}/releases"
@@ -50,7 +51,7 @@ function GetWindowsAsset {
     param (
         $Release
     )
-    $windowsAsset = $Release | Select-Object -ExpandProperty assets | Where-Object { $_.name -Like "*windows_amd64.exe" }
+    $windowsAsset = $Release | Select-Object -ExpandProperty assets | Where-Object { $_.name -Like "*${OS}_${ARCH}.exe" }
     if (!$windowsAsset) {
         throw "Cannot find the Windows rad CLI binary"
     }
@@ -109,34 +110,49 @@ if (-Not (Test-Path $RadiusRoot -PathType Container)) {
     }
 }
 
-# Get the list of releases from GitHub
-$releases = Invoke-RestMethod -Headers $githubHeader -Uri $GitHubReleaseJsonUrl -Method Get
-if ($releases.Count -eq 0) {
-    throw "No releases from github.com/${GitHubOrg}/${GitHubRepo}"
-}
+if ($Version -eq "edge") {
+    # Check if oras CLI is installed
+    $orasExists = Get-Command oras -ErrorAction SilentlyContinue
+    if (-Not $orasExists) {
+        Write-Output "Error: oras CLI is not installed or not found in PATH."
+        Write-Output "Please see https://edge.docs.radapp.io/installation for edge build installation instructions."
+        Exit 1
+    }
 
-$release = GetVersionInfo -Version $Version -Releases $releases
-if (!$release) {
-    throw "Cannot find the specified rad CLI binary version"
+    $DOWNLOAD_URL = "ghcr.io/radius-project/rad/${OS}_${ARCH}:latest"
+    Write-Output "Downloading edge version of the Radius CLI..."
+    oras pull $DOWNLOAD_URL -o $RadiusRoot
 }
-$asset = GetWindowsAsset -Release $release
-$assetName = $asset.name
-$exeFileUrl = $asset.url
-$exeFilePath = $RadiusRoot + "\" + $assetName
+else {
+    # Get the list of releases from GitHub
+    $releases = Invoke-RestMethod -Headers $githubHeader -Uri $GitHubReleaseJsonUrl -Method Get
+    if ($releases.Count -eq 0) {
+        throw "No releases from github.com/${GitHubOrg}/${GitHubRepo}"
+    }
 
-# Download rad CLI
-try {
-    Write-Output "Downloading $exeFileUrl..."
-    $githubHeader.Accept = "application/octet-stream"
-    $oldProgressPreference = $ProgressPreference
-    $ProgressPreference = "SilentlyContinue" # Do not show progress bar
-    Invoke-WebRequest -Headers $githubHeader -Uri $exeFileUrl -OutFile $exeFilePath
-}
-catch [Net.WebException] {
-    throw "ERROR: The specified release version: $Version does not exist."
-}
-finally {
-    $ProgressPreference = $oldProgressPreference;
+    $release = GetVersionInfo -Version $Version -Releases $releases
+    if (!$release) {
+        throw "Cannot find the specified rad CLI binary version"
+    }
+    $asset = GetWindowsAsset -Release $release
+    $assetName = $asset.name
+    $exeFileUrl = $asset.url
+    $exeFilePath = $RadiusRoot + "\" + $assetName
+
+    # Download rad CLI
+    try {
+        Write-Output "Downloading $exeFileUrl..."
+        $githubHeader.Accept = "application/octet-stream"
+        $oldProgressPreference = $ProgressPreference
+        $ProgressPreference = "SilentlyContinue" # Do not show progress bar
+        Invoke-WebRequest -Headers $githubHeader -Uri $exeFileUrl -OutFile $exeFilePath
+    }
+    catch [Net.WebException] {
+        throw "ERROR: The specified release version: $Version does not exist."
+    }
+    finally {
+        $ProgressPreference = $oldProgressPreference;
+    }
 }
 
 if (!(Test-Path $exeFilePath -PathType Leaf)) {
