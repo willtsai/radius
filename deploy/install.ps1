@@ -51,7 +51,7 @@ function GetWindowsAsset {
     param (
         $Release
     )
-    $windowsAsset = $Release | Select-Object -ExpandProperty assets | Where-Object { $_.name -Like "*${OS}_${ARCH}.exe" }
+    $windowsAsset = $Release | Select-Object -ExpandProperty assets | Where-Object { $_.name -Like "*${OS}_${Arch}.exe" }
     if (!$windowsAsset) {
         throw "Cannot find the Windows rad CLI binary"
     }
@@ -115,12 +115,12 @@ if ($Version -eq "edge") {
     $orasExists = Get-Command oras -ErrorAction SilentlyContinue
     if (-Not $orasExists) {
         Write-Output "Error: oras CLI is not installed or not found in PATH."
-        Write-Output "Please see https://edge.docs.radapp.io/installation for edge build installation instructions."
+        Write-Output "Please visit https://edge.docs.radapp.io/installation for edge build installation instructions."
         Exit 1
     }
 
-    $DOWNLOAD_URL = "ghcr.io/radius-project/rad/${OS}_${ARCH}:latest"
-    Write-Output "Downloading edge version of the Radius CLI..."
+    $downloadURL = "ghcr.io/radius-project/rad/${OS}_${Arch}:latest"
+    Write-Output "Downloading edge CLI from ${downloadURL}"
     oras pull $DOWNLOAD_URL -o $RadiusRoot
 }
 else {
