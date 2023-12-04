@@ -122,8 +122,6 @@ if ($Version -eq "edge") {
     $downloadURL = "ghcr.io/radius-project/rad/${OS}-${Arch}:latest"
     Write-Output "Downloading edge CLI from ${downloadURL}"
     oras pull $downloadURL -o $RadiusRoot
-    Write-Output "Asset Name: ${assetName}"
-    $exeFilePath = $RadiusRoot + "\" + $assetName
 }
 else {
     # Get the list of releases from GitHub
@@ -139,8 +137,6 @@ else {
     $asset = GetWindowsAsset -Release $release
     $assetName = $asset.name
     $exeFileUrl = $asset.url
-    Write-Output "Asset Name: ${assetName}"
-    Write-Output "exe URL: ${exeFileUrl}"
     $exeFilePath = $RadiusRoot + "\" + $assetName
 
     # Download rad CLI
@@ -157,19 +153,23 @@ else {
     finally {
         $ProgressPreference = $oldProgressPreference;
     }
+
+    if (!(Test-Path $exeFilePath -PathType Leaf)) {
+      throw "Failed to download rad CLI binary - $exeFilePath"
+    }
+    
+    # Remove old rad CLI if exists
+    if (Test-Path $RadiusCliFilePath -PathType Leaf) {
+        Remove-Item -Recurse -Force $RadiusCliFilePath
+    }
+    
+    # Rename the downloaded rad CLI binary
+    Rename-Item -Path $exeFilePath -NewName $RadiusCliFileName -Force
 }
 
-if (!(Test-Path $exeFilePath -PathType Leaf)) {
-    throw "Failed to download rad CLI binary - $exeFilePath"
+if (!(Test-Path $RadiusCliFilePath -PathType Leaf)) {
+  throw "Failed to download rad CLI binary - $exeFilePath"
 }
-
-# Remove old rad CLI if exists
-if (Test-Path $RadiusCliFilePath -PathType Leaf) {
-    Remove-Item -Recurse -Force $RadiusCliFilePath
-}
-
-# Rename the downloaded rad CLI binary
-Rename-Item -Path $exeFilePath -NewName $RadiusCliFileName -Force
 
 # Print the version string of the installed CLI
 Write-Output "rad CLI version: $(&$RadiusCliFilePath version -o json | ConvertFrom-JSON | Select-Object -ExpandProperty version)"
