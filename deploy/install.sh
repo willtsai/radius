@@ -121,12 +121,12 @@ downloadFile() {
     if [ "$RELEASE_TAG" == "edge" ]; then
         if ! command -v oras &> /dev/null; then
             echo "Error: oras CLI is not installed or not found in PATH."
-            echo "Please see https://edge.docs.radapp.io/installation for edge build installation instructions."
+            echo "Please visit https://edge.docs.radapp.io/installation for edge CLI installation instructions."
             exit 1
         fi
 
         DOWNLOAD_URL="ghcr.io/radius-project/rad/${OS}-${ARCH}:latest"
-        echo "Downloading edge version of the Radius CLI..."
+        echo "Downloading edge CLI from ${DOWNLOAD_URL}..."
         oras pull $DOWNLOAD_URL -o $RADIUS_TMP_ROOT
         mv $RADIUS_TMP_ROOT/rad $ARTIFACT_TMP_FILE
     else
