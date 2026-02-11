@@ -1,0 +1,125 @@
+name: 'Radius App Graph Diff'
+description: 'Compare application graphs between PR branches and post visual diff comments'
+author: 'Radius Project'
+
+branding:
+  icon: 'git-pull-request'
+  color: 'blue'
+
+inputs:
+  github-token:
+    description: 'GitHub token for API access (permissions: pull-requests: write, contents: read)'
+    required: true
+    default: ${{ github.token }}
+
+  graph-path:
+    description: 'Path to the app-graph.json file (supports glob for monorepos)'
+    required: false
+    default: '.radius/app-graph.json'
+
+  base-ref:
+    description: 'Base ref for comparison (defaults to PR base branch)'
+    required: false
+    default: ''
+
+  head-ref:
+    description: 'Head ref for comparison (defaults to PR head branch)'
+    required: false
+    default: ''
+
+  fail-on-stale:
+    description: 'Fail the action if committed graph is out of sync with Bicep files'
+    required: false
+    default: 'false'
+
+  include-mermaid:
+    description: 'Include Mermaid diagrams in PR comment'
+    required: false
+    default: 'true'
+
+  comment-header:
+    description: 'Header text for PR comment (used to identify and update existing comments)'
+    required: false
+    default: '<!-- radius-app-graph-diff -->'
+
+  monorepo-glob:
+    description: 'Glob pattern for monorepo support (e.g., "apps/**/.radius/app-graph.json")'
+    required: false
+    default: ''
+
+outputs:
+  has-changes:
+    description: 'Whether any graph changes were detected'
+    value: ${{ steps.diff.outputs.has-changes }}
+
+  added-count:
+    description: 'Number of resources added'
+    value: ${{ steps.diff.outputs.added-count }}
+
+  removed-count:
+    description: 'Number of resources removed'
+    value: ${{ steps.diff.outputs.removed-count }}
+
+  modified-count:
+    description: 'Number of resources modified'
+    value: ${{ steps.diff.outputs.modified-count }}
+
+  diff-json:
+    description: 'JSON representation of the diff'
+    value: ${{ steps.diff.outputs.diff-json }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Detect graph files
+      id: detect
+      shell: bash
+      run: |
+        ${{ github.action_path }}/scripts/detect.sh
+      env:
+        GRAPH_PATH: ${{ inputs.graph-path }}
+        MONOREPO_GLOB: ${{ inputs.monorepo-glob }}
+
+    - name: Validate graph freshness
+      id: validate
+      if: inputs.fail-on-stale == 'true'
+      shell: bash
+      run: |
+        ${{ github.action_path }}/scripts/validate.sh
+      env:
+        GRAPH_FILES: ${{ steps.detect.outputs.files }}
+        FAIL_ON_STALE: ${{ inputs.fail-on-stale }}
+
+    - name: Compute graph diff
+      id: diff
+      shell: bash
+      run: |
+        ${{ github.action_path }}/scripts/diff.sh
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GRAPH_FILES: ${{ steps.detect.outputs.files }}
+        BASE_REF: ${{ inputs.base-ref || github.event.pull_request.base.sha }}
+        HEAD_REF: ${{ inputs.head-ref || github.event.pull_request.head.sha }}
+
+    - name: Render PR comment
+      id: render
+      if: steps.diff.outputs.has-changes == 'true'
+      shell: bash
+      run: |
+        ${{ github.action_path }}/scripts/render.sh
+      env:
+        DIFF_JSON: ${{ steps.diff.outputs.diff-json }}
+        INCLUDE_MERMAID: ${{ inputs.include-mermaid }}
+
+    - name: Post or update PR comment
+      id: comment
+      if: github.event_name == 'pull_request'
+      shell: bash
+      run: |
+        ${{ github.action_path }}/scripts/comment.sh
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        COMMENT_BODY: ${{ steps.render.outputs.comment-body || steps.diff.outputs.no-changes-body }}
+        COMMENT_HEADER: ${{ inputs.comment-header }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
