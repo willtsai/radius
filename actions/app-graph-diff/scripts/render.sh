@@ -19,6 +19,43 @@ fi
 # Optional variables with defaults
 INCLUDE_MERMAID="${INCLUDE_MERMAID:-true}"
 
+# Extract resource name from a resource ID (last path segment)
+name_from_id() {
+    echo "$1" | awk -F'/' '{print $NF}'
+}
+
+# Render connections changes section
+render_connections_section() {
+    local diff="$1"
+    local added_count
+    local removed_count
+    added_count=$(echo "${diff}" | jq '.addedConnections | length')
+    removed_count=$(echo "${diff}" | jq '.removedConnections | length')
+
+    [[ "${added_count}" -eq 0 && "${removed_count}" -eq 0 ]] && return
+
+    echo "### 🔗 Connection Changes"
+    echo ""
+
+    if [[ "${added_count}" -gt 0 ]]; then
+        echo "**Added Connections**"
+        echo ""
+        echo "| Source | Target | Type |"
+        echo "|--------|--------|------|"
+        echo "${diff}" | jq -r '.addedConnections[] | "| \(.sourceId | split("/") | last) | \(.targetId | split("/") | last) | \(.type // "-") |"'
+        echo ""
+    fi
+
+    if [[ "${removed_count}" -gt 0 ]]; then
+        echo "**Removed Connections**"
+        echo ""
+        echo "| Source | Target | Type |"
+        echo "|--------|--------|------|"
+        echo "${diff}" | jq -r '.removedConnections[] | "| ~~\(.sourceId | split("/") | last)~~ | ~~\(.targetId | split("/") | last)~~ | \(.type // "-") |"'
+        echo ""
+    fi
+}
+
 # Render summary badges
 render_badges() {
     local diff="$1"
@@ -31,9 +68,16 @@ render_badges() {
     removed=$(echo "${diff}" | jq -r '.summary.resourcesRemoved // 0')
     modified=$(echo "${diff}" | jq -r '.summary.resourcesModified // 0')
     
+    local conn_added
+    local conn_removed
+    conn_added=$(echo "${diff}" | jq -r '.summary.connectionsAdded // 0')
+    conn_removed=$(echo "${diff}" | jq -r '.summary.connectionsRemoved // 0')
+    
     [[ "${added}" -gt 0 ]] && badges="${badges}➕ ${added} added | "
     [[ "${removed}" -gt 0 ]] && badges="${badges}➖ ${removed} removed | "
     [[ "${modified}" -gt 0 ]] && badges="${badges}🔄 ${modified} modified | "
+    [[ "${conn_added}" -gt 0 ]] && badges="${badges}🔗 ${conn_added} connections added | "
+    [[ "${conn_removed}" -gt 0 ]] && badges="${badges}🔗 ${conn_removed} connections removed | "
     
     # Remove trailing separator
     badges="${badges% | }"
@@ -106,28 +150,71 @@ render_modified_section() {
     done < <(echo "${diff}" | jq -c '.modifiedResources[]')
 }
 
-# Render simple Mermaid diagram
+# Sanitize a resource ID into a valid Mermaid node identifier
+mermaid_node_id() {
+    echo "$1" | sed 's/[^a-zA-Z0-9]/_/g'
+}
+
+# Render Mermaid diagram with resources and connections
 render_mermaid() {
     local diff="$1"
-    
+
     cat << 'EOF'
 ### Graph Visualization
 
 ```mermaid
 graph LR
 EOF
-    
-    # Render added resources with green styling
+
+    # Render resource nodes
     echo "${diff}" | jq -r '.addedResources[] | "    \(.id | gsub("[^a-zA-Z0-9]"; "_"))[\"\(.name // .id)\"]:::added"'
-    
-    # Render removed resources with red styling
     echo "${diff}" | jq -r '.removedResources[] | "    \(.id | gsub("[^a-zA-Z0-9]"; "_"))[\"\(.name // .id)\"]:::removed"'
-    
-    # Render modified resources with yellow styling
     echo "${diff}" | jq -r '.modifiedResources[] | "    \(.id | gsub("[^a-zA-Z0-9]"; "_"))[\"\(.name // .id)\"]:::modified"'
-    
+
+    # Render connection edges with link styles
+    # Track link index for linkStyle directives (Mermaid numbers links sequentially)
+    local link_index=0
+    local link_styles=""
+
+    # Added connections (green)
+    while IFS= read -r conn; do
+        [[ -z "${conn}" ]] && continue
+        local src tgt label
+        src=$(echo "${conn}" | jq -r '.sourceId | gsub("[^a-zA-Z0-9]"; "_")')
+        tgt=$(echo "${conn}" | jq -r '.targetId | gsub("[^a-zA-Z0-9]"; "_")')
+        label=$(echo "${conn}" | jq -r '.type // ""')
+        if [[ -n "${label}" ]]; then
+            echo "    ${src} -->|${label}| ${tgt}"
+        else
+            echo "    ${src} --> ${tgt}"
+        fi
+        link_styles+="    linkStyle ${link_index} stroke:#228B22,stroke-width:2px"$'\n'
+        link_index=$((link_index + 1))
+    done < <(echo "${diff}" | jq -c '.addedConnections[]?')
+
+    # Removed connections (red, dashed)
+    while IFS= read -r conn; do
+        [[ -z "${conn}" ]] && continue
+        local src tgt label
+        src=$(echo "${conn}" | jq -r '.sourceId | gsub("[^a-zA-Z0-9]"; "_")')
+        tgt=$(echo "${conn}" | jq -r '.targetId | gsub("[^a-zA-Z0-9]"; "_")')
+        label=$(echo "${conn}" | jq -r '.type // ""')
+        if [[ -n "${label}" ]]; then
+            echo "    ${src} -.->|${label}| ${tgt}"
+        else
+            echo "    ${src} -.-> ${tgt}"
+        fi
+        link_styles+="    linkStyle ${link_index} stroke:#DC143C,stroke-width:2px"$'\n'
+        link_index=$((link_index + 1))
+    done < <(echo "${diff}" | jq -c '.removedConnections[]?')
+
+    echo ""
+    # Emit link style directives
+    if [[ -n "${link_styles}" ]]; then
+        printf '%s' "${link_styles}"
+    fi
+
     cat << 'EOF'
-    
     classDef added fill:#90EE90,stroke:#228B22
     classDef removed fill:#FFB6C1,stroke:#DC143C
     classDef modified fill:#FFFACD,stroke:#DAA520
@@ -165,6 +252,7 @@ main() {
     body+="$(render_added_section "${diff}")"$'\n\n'
     body+="$(render_removed_section "${diff}")"$'\n\n'
     body+="$(render_modified_section "${diff}")"$'\n\n'
+    body+="$(render_connections_section "${diff}")"$'\n\n'
     
     body+="</details>"$'\n\n'
     

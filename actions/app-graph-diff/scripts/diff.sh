@@ -110,6 +110,59 @@ compare_resources() {
         '{addedResources: $added, removedResources: $removed, modifiedResources: $modified}'
 }
 
+# Compare connections between two graphs
+compare_connections() {
+    local base="$1"
+    local head="$2"
+
+    # Build connection keys as "sourceId->targetId" for comparison
+    local base_keys
+    local head_keys
+    base_keys=$(echo "${base}" | jq -r '.connections[]? | "\(.sourceId)->\(.targetId)"' | sort)
+    head_keys=$(echo "${head}" | jq -r '.connections[]? | "\(.sourceId)->\(.targetId)"' | sort)
+
+    # Find added connections (in head but not in base)
+    local added_keys
+    added_keys=$(comm -13 <(echo "${base_keys}") <(echo "${head_keys}"))
+
+    # Find removed connections (in base but not in head)
+    local removed_keys
+    removed_keys=$(comm -23 <(echo "${base_keys}") <(echo "${head_keys}"))
+
+    # Build added connections array
+    local added_json="[]"
+    while IFS= read -r key; do
+        [[ -z "${key}" ]] && continue
+        local src tgt
+        src="${key%%->*}"
+        tgt="${key##*->}"
+        local conn
+        conn=$(echo "${head}" | jq --arg s "${src}" --arg t "${tgt}" \
+            '[.connections[] | select(.sourceId == $s and .targetId == $t)] | first')
+        [[ "${conn}" == "null" ]] && continue
+        added_json=$(echo "${added_json}" | jq --argjson c "${conn}" '. + [$c]')
+    done <<< "${added_keys}"
+
+    # Build removed connections array
+    local removed_json="[]"
+    while IFS= read -r key; do
+        [[ -z "${key}" ]] && continue
+        local src tgt
+        src="${key%%->*}"
+        tgt="${key##*->}"
+        local conn
+        conn=$(echo "${base}" | jq --arg s "${src}" --arg t "${tgt}" \
+            '[.connections[] | select(.sourceId == $s and .targetId == $t)] | first')
+        [[ "${conn}" == "null" ]] && continue
+        removed_json=$(echo "${removed_json}" | jq --argjson c "${conn}" '. + [$c]')
+    done <<< "${removed_keys}"
+
+    jq -n \
+        --argjson added "${added_json}" \
+        --argjson removed "${removed_json}" \
+        '{addedConnections: $added, removedConnections: $removed}'
+}
+
 # Compute diff summary
 compute_summary() {
     local diff="$1"
@@ -117,25 +170,31 @@ compute_summary() {
     local added_count
     local removed_count
     local modified_count
+    local conn_added
+    local conn_removed
     added_count=$(echo "${diff}" | jq '.addedResources | length')
     removed_count=$(echo "${diff}" | jq '.removedResources | length')
     modified_count=$(echo "${diff}" | jq '.modifiedResources | length')
+    conn_added=$(echo "${diff}" | jq '.addedConnections | length')
+    conn_removed=$(echo "${diff}" | jq '.removedConnections | length')
     
-    local total=$((added_count + removed_count + modified_count))
+    local total=$((added_count + removed_count + modified_count + conn_added + conn_removed))
     
     jq -n \
         --argjson total "${total}" \
         --argjson added "${added_count}" \
         --argjson removed "${removed_count}" \
         --argjson modified "${modified_count}" \
-        '{totalChanges: $total, resourcesAdded: $added, resourcesRemoved: $removed, resourcesModified: $modified, connectionsAdded: 0, connectionsRemoved: 0}'
+        --argjson connAdded "${conn_added}" \
+        --argjson connRemoved "${conn_removed}" \
+        '{totalChanges: $total, resourcesAdded: $added, resourcesRemoved: $removed, resourcesModified: $modified, connectionsAdded: $connAdded, connectionsRemoved: $connRemoved}'
 }
 
 main() {
     echo "Computing graph diff between ${BASE_REF} and ${HEAD_REF}"
     
     # Process each graph file
-    local combined_diff='{"addedResources":[],"removedResources":[],"modifiedResources":[]}'
+    local combined_diff='{"addedResources":[],"removedResources":[],"modifiedResources":[],"addedConnections":[],"removedConnections":[]}'
     
     IFS=',' read -ra files <<< "${GRAPH_FILES}"
     for file in "${files[@]}"; do
@@ -149,9 +208,18 @@ main() {
         
         local file_diff
         file_diff=$(compare_resources "${base_graph}" "${head_graph}")
+
+        local conn_diff
+        conn_diff=$(compare_connections "${base_graph}" "${head_graph}")
         
-        # Merge into combined diff
-        combined_diff=$(jq -s '.[0].addedResources += .[1].addedResources | .[0].removedResources += .[1].removedResources | .[0].modifiedResources += .[1].modifiedResources | .[0]' <(echo "${combined_diff}") <(echo "${file_diff}"))
+        # Merge resource and connection diffs into combined diff
+        combined_diff=$(jq -s '
+            .[0].addedResources += .[1].addedResources |
+            .[0].removedResources += .[1].removedResources |
+            .[0].modifiedResources += .[1].modifiedResources |
+            .[0].addedConnections += .[2].addedConnections |
+            .[0].removedConnections += .[2].removedConnections |
+            .[0]' <(echo "${combined_diff}") <(echo "${file_diff}") <(echo "${conn_diff}"))
     done
     
     # Add summary
