@@ -183,7 +183,7 @@ EOF
     local link_index=0
     local link_styles=""
 
-    # Removed connections (red, dashed)
+    # Removed connections (red)
     while IFS= read -r conn; do
         [[ -z "${conn}" ]] && continue
         local src tgt label
@@ -191,9 +191,9 @@ EOF
         tgt=$(echo "${conn}" | jq -r '.targetId | gsub("[^a-zA-Z0-9]"; "_")')
         label=$(echo "${conn}" | jq -r '.type // ""')
         if [[ -n "${label}" ]]; then
-            echo "    ${src} -.->|${label}| ${tgt}"
+            echo "    ${src} -->|${label}| ${tgt}"
         else
-            echo "    ${src} -.-> ${tgt}"
+            echo "    ${src} --> ${tgt}"
         fi
         link_styles+="    linkStyle ${link_index} stroke:#DC143C,stroke-width:2px"$'\n'
         link_index=$((link_index + 1))
