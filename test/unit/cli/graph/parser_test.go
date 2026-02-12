@@ -77,6 +77,56 @@ func TestParseARMTemplate(t *testing.T) {
 			},
 		},
 		{
+			name: "v2 template with resources as map",
+			template: map[string]any{
+				"$schema":         "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+				"contentVersion":  "1.0.0.0",
+				"languageVersion": "2.0",
+				"resources": map[string]any{
+					"myapp": map[string]any{
+						"type": "Applications.Core/applications@2023-10-01-preview",
+						"properties": map[string]any{
+							"name":        "my-app",
+							"environment": "[parameters('environment')]",
+						},
+					},
+					"frontend": map[string]any{
+						"type": "Applications.Core/containers@2023-10-01-preview",
+						"properties": map[string]any{
+							"name":        "frontend",
+							"application": "[resourceInfo('myapp').id]",
+							"container": map[string]any{
+								"image": "ghcr.io/myapp/frontend:latest",
+							},
+						},
+						"dependsOn": []any{
+							"myapp",
+						},
+					},
+				},
+			},
+			validate: func(t *testing.T, result *bicep.ARMTemplate) {
+				require.Len(t, result.Resources, 2)
+
+				// Build a map by name for order-independent assertions
+				resourcesByName := make(map[string]bicep.ARMResource)
+				for _, r := range result.Resources {
+					resourcesByName[r.Name] = r
+				}
+
+				app := resourcesByName["my-app"]
+				assert.Equal(t, "Applications.Core/applications", app.Type)
+				assert.Equal(t, "2023-10-01-preview", app.APIVersion)
+				assert.Equal(t, "my-app", app.Name)
+
+				frontend := resourcesByName["frontend"]
+				assert.Equal(t, "Applications.Core/containers", frontend.Type)
+				assert.Equal(t, "2023-10-01-preview", frontend.APIVersion)
+				assert.Equal(t, "frontend", frontend.Name)
+				assert.Contains(t, frontend.DependsOn, "myapp")
+			},
+		},
+		{
 			name: "template with parameters",
 			template: map[string]any{
 				"$schema":        "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",

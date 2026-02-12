@@ -115,9 +115,13 @@ func (g *StaticGraphGenerator) Generate(bicepFiles []string, opts GenerateOption
 			return nil, fmt.Errorf("failed to parse ARM template from %s: %w", bicepFile, err)
 		}
 
-		// Validate required parameters if no parameters file provided
+		// Validate required parameters if no parameters file provided.
+		// Well-known Radius parameters (environment, application) are always
+		// provided at deployment time and don't affect graph structure, so we
+		// skip them during static analysis.
 		if opts.ParametersFile == "" {
 			required := armTemplate.GetRequiredParameterNames()
+			required = FilterWellKnownRadiusParameters(required)
 			if len(required) > 0 {
 				return nil, fmt.Errorf("required parameters missing. Use --parameters to provide values for: %v", required)
 			}
@@ -197,4 +201,24 @@ func (g *StaticGraphGenerator) GenerateFromSingleFile(bicepFile string, paramete
 		ParametersFile:     parametersFile,
 		IncludeGitMetadata: g.IncludeGitMetadata,
 	})
+}
+
+// WellKnownRadiusParameters are standard Radius deployment parameters that are
+// always available at deployment time. These don't affect graph structure and
+// should not block static graph generation.
+var WellKnownRadiusParameters = map[string]bool{
+	"environment": true,
+	"application": true,
+}
+
+// FilterWellKnownRadiusParameters removes well-known Radius parameters from the
+// list, returning only parameters that genuinely require user-provided values.
+func FilterWellKnownRadiusParameters(params []string) []string {
+	var filtered []string
+	for _, p := range params {
+		if !WellKnownRadiusParameters[p] {
+			filtered = append(filtered, p)
+		}
+	}
+	return filtered
 }

@@ -141,12 +141,17 @@ func (r *Runner) Validate(cmd *cobra.Command, args []string) error {
 
 // validateBicepInput validates input for static graph generation from Bicep files.
 func (r *Runner) validateBicepInput(cmd *cobra.Command, bicepFile string) error {
-	r.BicepFile = bicepFile
-
 	// Check file exists
 	if _, err := r.FileSystem.Stat(bicepFile); err != nil {
 		return clierrors.Message("Bicep file %q not found: %v", bicepFile, err)
 	}
+
+	// Resolve to absolute path so output paths are predictable
+	absBicep, err := filepath.Abs(bicepFile)
+	if err == nil {
+		bicepFile = absBicep
+	}
+	r.BicepFile = bicepFile
 
 	// Validate parameters file if specified
 	if r.ParametersFile != "" {
@@ -158,6 +163,14 @@ func (r *Runner) validateBicepInput(cmd *cobra.Command, bicepFile string) error 
 	// Set default output path if not specified and not using stdout
 	if r.OutputPath == "" && !r.UseStdout {
 		r.OutputPath = DefaultOutputPath(bicepFile)
+	}
+
+	// Resolve to absolute path so the output location is unambiguous
+	if r.OutputPath != "" {
+		absPath, err := filepath.Abs(r.OutputPath)
+		if err == nil {
+			r.OutputPath = absPath
+		}
 	}
 
 	// Validate output format

@@ -18,6 +18,7 @@ package bicep
 
 import (
 	"encoding/json"
+	"strings"
 )
 
 // ARMTemplate represents the structure of an ARM JSON template.
@@ -133,11 +134,19 @@ func ParseARMTemplate(template map[string]any) (*ARMTemplate, error) {
 		result.Variables = vars
 	}
 
-	// Parse resources
+	// Parse resources - handle both languageVersion 1.0 (array) and 2.0 (map) formats
 	if resources, ok := template["resources"].([]any); ok {
+		// v1 format: resources is an array of objects
 		for _, res := range resources {
 			if resMap, ok := res.(map[string]any); ok {
 				result.Resources = append(result.Resources, parseARMResource(resMap))
+			}
+		}
+	} else if resources, ok := template["resources"].(map[string]any); ok {
+		// v2 format (languageVersion 2.0): resources is a map keyed by symbolic name
+		for symbolicName, res := range resources {
+			if resMap, ok := res.(map[string]any); ok {
+				result.Resources = append(result.Resources, parseARMResourceV2(symbolicName, resMap))
 			}
 		}
 	}
@@ -198,6 +207,69 @@ func parseARMResource(m map[string]any) ARMResource {
 	}
 	if props, ok := m["properties"].(map[string]any); ok {
 		r.Properties = props
+	}
+	if tags, ok := m["tags"].(map[string]any); ok {
+		r.Tags = make(map[string]string)
+		for k, v := range tags {
+			if vStr, ok := v.(string); ok {
+				r.Tags[k] = vStr
+			}
+		}
+	}
+	if cond, ok := m["condition"]; ok {
+		r.Condition = cond
+	}
+	if comments, ok := m["comments"].(string); ok {
+		r.Comments = comments
+	}
+
+	return r
+}
+
+// parseARMResourceV2 parses a resource definition from ARM JSON v2.0 (languageVersion 2.0) format.
+// In v2.0, the type field includes the API version (e.g., "Applications.Core/containers@2023-10-01-preview")
+// and the name is inside properties rather than at the top level.
+func parseARMResourceV2(symbolicName string, m map[string]any) ARMResource {
+	r := ARMResource{}
+
+	if t, ok := m["type"].(string); ok {
+		// In v2.0, type includes apiVersion: "Type@ApiVersion"
+		parts := strings.SplitN(t, "@", 2)
+		r.Type = parts[0]
+		if len(parts) == 2 {
+			r.APIVersion = parts[1]
+		}
+	}
+
+	// In v2.0, name is inside properties
+	if props, ok := m["properties"].(map[string]any); ok {
+		r.Properties = props
+		if n, ok := props["name"].(string); ok {
+			r.Name = n
+		}
+	}
+
+	// Fall back to top-level name if present
+	if r.Name == "" {
+		if n, ok := m["name"].(string); ok {
+			r.Name = n
+		}
+	}
+
+	// If still no name, use the symbolic name
+	if r.Name == "" {
+		r.Name = symbolicName
+	}
+
+	if loc, ok := m["location"].(string); ok {
+		r.Location = loc
+	}
+	if deps, ok := m["dependsOn"].([]any); ok {
+		for _, dep := range deps {
+			if depStr, ok := dep.(string); ok {
+				r.DependsOn = append(r.DependsOn, depStr)
+			}
+		}
 	}
 	if tags, ok := m["tags"].(map[string]any); ok {
 		r.Tags = make(map[string]string)

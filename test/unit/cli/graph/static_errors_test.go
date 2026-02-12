@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/radius-project/radius/pkg/cli/bicep"
+	"github.com/radius-project/radius/pkg/cli/cmd/app/graph"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -108,6 +109,31 @@ func TestStaticGraphErrors_RequiredParametersMissing(t *testing.T) {
 	assert.Len(t, required, 2)
 	assert.Contains(t, required, "environment")
 	assert.Contains(t, required, "application")
+}
+
+func TestFilterWellKnownRadiusParameters(t *testing.T) {
+	t.Run("filters environment and application", func(t *testing.T) {
+		params := []string{"environment", "application"}
+		filtered := graph.FilterWellKnownRadiusParameters(params)
+		assert.Empty(t, filtered)
+	})
+
+	t.Run("keeps unknown parameters", func(t *testing.T) {
+		params := []string{"environment", "application", "customParam", "anotherParam"}
+		filtered := graph.FilterWellKnownRadiusParameters(params)
+		assert.Equal(t, []string{"customParam", "anotherParam"}, filtered)
+	})
+
+	t.Run("handles empty list", func(t *testing.T) {
+		filtered := graph.FilterWellKnownRadiusParameters(nil)
+		assert.Empty(t, filtered)
+	})
+
+	t.Run("keeps all when no well-known params", func(t *testing.T) {
+		params := []string{"foo", "bar"}
+		filtered := graph.FilterWellKnownRadiusParameters(params)
+		assert.Equal(t, []string{"foo", "bar"}, filtered)
+	})
 }
 
 func TestStaticGraphErrors_ResourceIDConstruction(t *testing.T) {
