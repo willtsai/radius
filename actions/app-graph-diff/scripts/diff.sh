@@ -33,6 +33,18 @@ read_graph_at_ref() {
     fi
 }
 
+# Filter out application resources and their connections from a graph
+filter_applications() {
+    local graph="$1"
+    echo "${graph}" | jq '
+        (.resources // []) as $res |
+        [$res[] | select(.type != "Applications.Core/applications")] as $filtered |
+        [$res[] | select(.type == "Applications.Core/applications") | .id] as $app_ids |
+        .resources = $filtered |
+        .connections = [(.connections // [])[] | select((.sourceId as $s | $app_ids | index($s) | not) and (.targetId as $t | $app_ids | index($t) | not))]
+    '
+}
+
 # Compare resources between two graphs
 compare_resources() {
     local base="$1"
@@ -228,6 +240,10 @@ main() {
         local head_graph
         base_graph=$(read_graph_at_ref "${file}" "${BASE_REF}")
         head_graph=$(read_graph_at_ref "${file}" "${HEAD_REF}")
+        
+        # Filter out application resources (Applications.Core/applications)
+        base_graph=$(filter_applications "${base_graph}")
+        head_graph=$(filter_applications "${head_graph}")
         
         local file_diff
         file_diff=$(compare_resources "${base_graph}" "${head_graph}")
