@@ -235,3 +235,68 @@ func TestStaticGraphGeneration_DependsOnRelationships(t *testing.T) {
 	require.NotNil(t, frontend)
 	assert.Contains(t, frontend.DependsOn, "backend")
 }
+
+func TestStaticGraphGeneration_ConnectionIDsMatchResourceIDs(t *testing.T) {
+	// Verify that connection source/target IDs are remapped from names
+	// to full resource IDs matching the extracted resources.
+	template := map[string]any{
+		"resources": []any{
+			map[string]any{
+				"type":       "Applications.Core/containers",
+				"apiVersion": "2023-10-01-preview",
+				"name":       "demo",
+				"properties": map[string]any{
+					"connections": map[string]any{
+						"redis": map[string]any{
+							"source": "db",
+						},
+					},
+				},
+			},
+			map[string]any{
+				"type":       "Applications.Datastores/redisCaches",
+				"apiVersion": "2023-10-01-preview",
+				"name":       "db",
+			},
+		},
+	}
+
+	armTemplate, err := bicep.ParseARMTemplate(template)
+	require.NoError(t, err)
+
+	// Extract resources (full IDs)
+	extractor := bicep.NewResourceExtractor("default")
+	resources, err := extractor.ExtractResources(armTemplate, "app.bicep")
+	require.NoError(t, err)
+	require.Len(t, resources, 2)
+
+	// Extract connections (name-based IDs)
+	connections := bicep.ExtractConnections(armTemplate)
+	require.Len(t, connections, 1)
+	// Before remapping, connection IDs are just names
+	assert.Equal(t, "demo", connections[0].SourceResourceID)
+	assert.Equal(t, "db", connections[0].TargetResourceID)
+
+	// Simulate the remapping done in static.go's Generate()
+	nameToID := make(map[string]string)
+	for _, r := range resources {
+		nameToID[r.Name] = r.ID
+	}
+
+	srcID := connections[0].SourceResourceID
+	if fullID, ok := nameToID[srcID]; ok {
+		srcID = fullID
+	}
+	tgtID := connections[0].TargetResourceID
+	if fullID, ok := nameToID[tgtID]; ok {
+		tgtID = fullID
+	}
+
+	// After remapping, connection IDs must match resource IDs
+	assert.Equal(t, resources[0].ID, srcID, "source ID should match resource ID for 'demo'")
+	assert.Equal(t, resources[1].ID, tgtID, "target ID should match resource ID for 'db'")
+
+	// Both should be full /planes/... paths
+	assert.Contains(t, srcID, "/planes/radius/local/resourceGroups/default/providers/Applications.Core/containers/demo")
+	assert.Contains(t, tgtID, "/planes/radius/local/resourceGroups/default/providers/Applications.Datastores/redisCaches/db")
+}

@@ -139,10 +139,28 @@ func (g *StaticGraphGenerator) Generate(bicepFiles []string, opts GenerateOption
 
 		// Extract connections
 		connections := bicep.ExtractConnections(armTemplate)
+
+		// ExtractConnections uses resource names as IDs (e.g. "demo"),
+		// but the graph resources use full paths from the extractor
+		// (e.g. "/planes/radius/local/.../containers/demo").
+		// Build a lookup to remap connection endpoints to full resource IDs.
+		nameToID := make(map[string]string)
+		for _, r := range resources {
+			nameToID[r.Name] = r.ID
+		}
+
 		for _, conn := range connections {
+			srcID := conn.SourceResourceID
+			if fullID, ok := nameToID[srcID]; ok {
+				srcID = fullID
+			}
+			tgtID := conn.TargetResourceID
+			if fullID, ok := nameToID[tgtID]; ok {
+				tgtID = fullID
+			}
 			allConnections = append(allConnections, v20231001preview.StaticAppGraphConnection{
-				SourceID: conn.SourceResourceID,
-				TargetID: conn.TargetResourceID,
+				SourceID: srcID,
+				TargetID: tgtID,
 				Type:     v20231001preview.StaticConnectionType(conn.Type),
 			})
 		}
