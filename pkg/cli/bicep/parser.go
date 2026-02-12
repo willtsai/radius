@@ -75,10 +75,6 @@ type ARMResource struct {
 	// Name is the resource name (may contain expressions)
 	Name string `json:"name"`
 
-	// SymbolicName is the Bicep symbolic name (v2 ARM JSON map key).
-	// Empty for v1 format.
-	SymbolicName string `json:"-"`
-
 	// Location is the resource location
 	Location string `json:"location,omitempty"`
 
@@ -234,9 +230,7 @@ func parseARMResource(m map[string]any) ARMResource {
 // In v2.0, the type field includes the API version (e.g., "Applications.Core/containers@2023-10-01-preview")
 // and the name is inside properties rather than at the top level.
 func parseARMResourceV2(symbolicName string, m map[string]any) ARMResource {
-	r := ARMResource{
-		SymbolicName: symbolicName,
-	}
+	r := ARMResource{}
 
 	if t, ok := m["type"].(string); ok {
 		// In v2.0, type includes apiVersion: "Type@ApiVersion"
@@ -247,19 +241,11 @@ func parseARMResourceV2(symbolicName string, m map[string]any) ARMResource {
 		}
 	}
 
-	// In v2.0, the outer "properties" contains "name" and an inner
-	// "properties" with the actual resource configuration (connections,
-	// container settings, etc.).
-	if outerProps, ok := m["properties"].(map[string]any); ok {
-		if n, ok := outerProps["name"].(string); ok {
+	// In v2.0, name is inside properties
+	if props, ok := m["properties"].(map[string]any); ok {
+		r.Properties = props
+		if n, ok := props["name"].(string); ok {
 			r.Name = n
-		}
-		// Use the inner properties as the resource properties so that
-		// connection detection finds "connections" at the right level.
-		if innerProps, ok := outerProps["properties"].(map[string]any); ok {
-			r.Properties = innerProps
-		} else {
-			r.Properties = outerProps
 		}
 	}
 

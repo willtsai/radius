@@ -44,20 +44,6 @@ func (d *ConnectionDetector) BuildResourceIndex(resources []v20231001preview.Sta
 	}
 }
 
-// BuildResourceIndexWithSymbolicNames extends the resource index with v2 symbolic names.
-// In ARM JSON v2.0, dependsOn and reference() expressions use the Bicep symbolic name
-// rather than the resource name, so we need both in the lookup.
-func (d *ConnectionDetector) BuildResourceIndexWithSymbolicNames(armResources []ARMResource, graphResources []v20231001preview.StaticAppGraphResource) {
-	for i, armRes := range armResources {
-		if i >= len(graphResources) {
-			continue
-		}
-		if armRes.SymbolicName != "" && armRes.SymbolicName != armRes.Name {
-			d.ResourceIDs[armRes.SymbolicName] = graphResources[i].ID
-		}
-	}
-}
-
 // DetectConnections extracts connections from ARM resources.
 // It looks for:
 // - Explicit connections in the "connections" property
@@ -291,9 +277,6 @@ func ExtractConnections(template *ARMTemplate) []Connection {
 
 	// Detect connections
 	detector := NewConnectionDetector()
-	// Also index symbolic names for v2 ARM JSON where dependsOn and
-	// reference() expressions use the Bicep variable name.
-	detector.BuildResourceIndexWithSymbolicNames(template.Resources, graphResources)
 	connections := detector.DetectConnections(template.Resources, graphResources)
 
 	// Convert to Connection type
