@@ -155,14 +155,16 @@ main() {
     body+="<summary>View Details</summary>"$'\n\n'
     
     # Mermaid diagram
+    # Note: $() strips trailing newlines, so we append them explicitly
+    # to prevent sections from running together.
     if [[ "${INCLUDE_MERMAID}" == "true" ]]; then
-        body+=$(render_mermaid "${diff}")
+        body+="$(render_mermaid "${diff}")"$'\n\n'
     fi
     
     # Change sections
-    body+=$(render_added_section "${diff}")
-    body+=$(render_removed_section "${diff}")
-    body+=$(render_modified_section "${diff}")
+    body+="$(render_added_section "${diff}")"$'\n\n'
+    body+="$(render_removed_section "${diff}")"$'\n\n'
+    body+="$(render_modified_section "${diff}")"$'\n\n'
     
     body+="</details>"$'\n\n'
     
