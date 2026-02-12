@@ -155,25 +155,103 @@ mermaid_node_id() {
     echo "$1" | sed 's/[^a-zA-Z0-9]/_/g'
 }
 
-# Render Mermaid diagram with resources and connections
-render_mermaid() {
+# Render "Before" Mermaid diagram (unchanged + removed resources/connections)
+render_mermaid_before() {
     local diff="$1"
 
+    # Skip if nothing to show
+    local removed_res unchanged_res modified_res
+    removed_res=$(echo "${diff}" | jq '.removedResources | length')
+    unchanged_res=$(echo "${diff}" | jq '[.unchangedResources[]?] | length')
+    modified_res=$(echo "${diff}" | jq '.modifiedResources | length')
+    [[ "${removed_res}" -eq 0 && "${unchanged_res}" -eq 0 && "${modified_res}" -eq 0 ]] && return
+
     cat << 'EOF'
-### Graph Visualization
+#### Before
 
 ```mermaid
 graph LR
 EOF
 
-    # Render resource nodes (name + type in parentheses)
-    echo "${diff}" | jq -r '.addedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::added"'
+    # Unchanged resources
+    echo "${diff}" | jq -r '.unchangedResources[]? | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]"'
+    # Modified resources (shown as unchanged in Before view, since they existed before)
+    echo "${diff}" | jq -r '.modifiedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]"'
+    # Removed resources (highlighted red)
     echo "${diff}" | jq -r '.removedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::removed"'
-    echo "${diff}" | jq -r '.modifiedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::modified"'
-    echo "${diff}" | jq -r '.unchangedResources[]? | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::unchanged"'
 
-    # Render connection edges with link styles
-    # Track link index for linkStyle directives (Mermaid numbers links sequentially)
+    local link_index=0
+    local link_styles=""
+
+    # Removed connections (red, dashed)
+    while IFS= read -r conn; do
+        [[ -z "${conn}" ]] && continue
+        local src tgt label
+        src=$(echo "${conn}" | jq -r '.sourceId | gsub("[^a-zA-Z0-9]"; "_")')
+        tgt=$(echo "${conn}" | jq -r '.targetId | gsub("[^a-zA-Z0-9]"; "_")')
+        label=$(echo "${conn}" | jq -r '.type // ""')
+        if [[ -n "${label}" ]]; then
+            echo "    ${src} -.->|${label}| ${tgt}"
+        else
+            echo "    ${src} -.-> ${tgt}"
+        fi
+        link_styles+="    linkStyle ${link_index} stroke:#DC143C,stroke-width:2px"$'\n'
+        link_index=$((link_index + 1))
+    done < <(echo "${diff}" | jq -c '.removedConnections[]?')
+
+    # Unchanged connections
+    while IFS= read -r conn; do
+        [[ -z "${conn}" ]] && continue
+        local src tgt label
+        src=$(echo "${conn}" | jq -r '.sourceId | gsub("[^a-zA-Z0-9]"; "_")')
+        tgt=$(echo "${conn}" | jq -r '.targetId | gsub("[^a-zA-Z0-9]"; "_")')
+        label=$(echo "${conn}" | jq -r '.type // ""')
+        if [[ -n "${label}" ]]; then
+            echo "    ${src} -->|${label}| ${tgt}"
+        else
+            echo "    ${src} --> ${tgt}"
+        fi
+        link_index=$((link_index + 1))
+    done < <(echo "${diff}" | jq -c '.unchangedConnections[]?')
+
+    echo ""
+    if [[ -n "${link_styles}" ]]; then
+        printf '%s' "${link_styles}"
+    fi
+
+    cat << 'EOF'
+    classDef removed fill:#FFB6C1,stroke:#DC143C
+    classDef unchanged fill:#F0F0F0,stroke:#808080
+```
+
+EOF
+}
+
+# Render "After" Mermaid diagram (unchanged + added + modified resources/connections)
+render_mermaid_after() {
+    local diff="$1"
+
+    # Skip if nothing to show
+    local added_res unchanged_res modified_res
+    added_res=$(echo "${diff}" | jq '.addedResources | length')
+    unchanged_res=$(echo "${diff}" | jq '[.unchangedResources[]?] | length')
+    modified_res=$(echo "${diff}" | jq '.modifiedResources | length')
+    [[ "${added_res}" -eq 0 && "${unchanged_res}" -eq 0 && "${modified_res}" -eq 0 ]] && return
+
+    cat << 'EOF'
+#### After
+
+```mermaid
+graph LR
+EOF
+
+    # Unchanged resources
+    echo "${diff}" | jq -r '.unchangedResources[]? | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::unchanged"'
+    # Added resources (highlighted green)
+    echo "${diff}" | jq -r '.addedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::added"'
+    # Modified resources (highlighted yellow)
+    echo "${diff}" | jq -r '.modifiedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::modified"'
+
     local link_index=0
     local link_styles=""
 
@@ -193,23 +271,7 @@ EOF
         link_index=$((link_index + 1))
     done < <(echo "${diff}" | jq -c '.addedConnections[]?')
 
-    # Removed connections (red, dashed)
-    while IFS= read -r conn; do
-        [[ -z "${conn}" ]] && continue
-        local src tgt label
-        src=$(echo "${conn}" | jq -r '.sourceId | gsub("[^a-zA-Z0-9]"; "_")')
-        tgt=$(echo "${conn}" | jq -r '.targetId | gsub("[^a-zA-Z0-9]"; "_")')
-        label=$(echo "${conn}" | jq -r '.type // ""')
-        if [[ -n "${label}" ]]; then
-            echo "    ${src} -.->|${label}| ${tgt}"
-        else
-            echo "    ${src} -.-> ${tgt}"
-        fi
-        link_styles+="    linkStyle ${link_index} stroke:#DC143C,stroke-width:2px"$'\n'
-        link_index=$((link_index + 1))
-    done < <(echo "${diff}" | jq -c '.removedConnections[]?')
-
-    # Unchanged connections (default style, no special color)
+    # Unchanged connections
     while IFS= read -r conn; do
         [[ -z "${conn}" ]] && continue
         local src tgt label
@@ -225,14 +287,12 @@ EOF
     done < <(echo "${diff}" | jq -c '.unchangedConnections[]?')
 
     echo ""
-    # Emit link style directives
     if [[ -n "${link_styles}" ]]; then
         printf '%s' "${link_styles}"
     fi
 
     cat << 'EOF'
     classDef added fill:#90EE90,stroke:#228B22
-    classDef removed fill:#FFB6C1,stroke:#DC143C
     classDef modified fill:#FFFACD,stroke:#DAA520
     classDef unchanged fill:#F0F0F0,stroke:#808080
 ```
@@ -258,11 +318,13 @@ main() {
     body+="<details>"$'\n'
     body+="<summary>View Details</summary>"$'\n\n'
     
-    # Mermaid diagram
+    # Mermaid diagrams (before/after views)
     # Note: $() strips trailing newlines, so we append them explicitly
     # to prevent sections from running together.
     if [[ "${INCLUDE_MERMAID}" == "true" ]]; then
-        body+="$(render_mermaid "${diff}")"$'\n\n'
+        body+="### Graph Visualization"$'\n\n'
+        body+="$(render_mermaid_before "${diff}")"$'\n\n'
+        body+="$(render_mermaid_after "${diff}")"$'\n\n'
     fi
     
     # Change sections
