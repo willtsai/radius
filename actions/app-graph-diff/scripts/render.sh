@@ -170,6 +170,7 @@ EOF
     echo "${diff}" | jq -r '.addedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::added"'
     echo "${diff}" | jq -r '.removedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::removed"'
     echo "${diff}" | jq -r '.modifiedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::modified"'
+    echo "${diff}" | jq -r '.unchangedResources[]? | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::unchanged"'
 
     # Render connection edges with link styles
     # Track link index for linkStyle directives (Mermaid numbers links sequentially)
@@ -208,6 +209,21 @@ EOF
         link_index=$((link_index + 1))
     done < <(echo "${diff}" | jq -c '.removedConnections[]?')
 
+    # Unchanged connections (default style, no special color)
+    while IFS= read -r conn; do
+        [[ -z "${conn}" ]] && continue
+        local src tgt label
+        src=$(echo "${conn}" | jq -r '.sourceId | gsub("[^a-zA-Z0-9]"; "_")')
+        tgt=$(echo "${conn}" | jq -r '.targetId | gsub("[^a-zA-Z0-9]"; "_")')
+        label=$(echo "${conn}" | jq -r '.type // ""')
+        if [[ -n "${label}" ]]; then
+            echo "    ${src} -->|${label}| ${tgt}"
+        else
+            echo "    ${src} --> ${tgt}"
+        fi
+        link_index=$((link_index + 1))
+    done < <(echo "${diff}" | jq -c '.unchangedConnections[]?')
+
     echo ""
     # Emit link style directives
     if [[ -n "${link_styles}" ]]; then
@@ -218,6 +234,7 @@ EOF
     classDef added fill:#90EE90,stroke:#228B22
     classDef removed fill:#FFB6C1,stroke:#DC143C
     classDef modified fill:#FFFACD,stroke:#DAA520
+    classDef unchanged fill:#F0F0F0,stroke:#808080
 ```
 
 EOF

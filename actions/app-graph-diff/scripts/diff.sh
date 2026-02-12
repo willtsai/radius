@@ -74,8 +74,9 @@ compare_resources() {
         removed_json=$(echo "${removed_json}" | jq --argjson res "${resource}" '. + [$res]')
     done <<< "${removed_ids}"
     
-    # Check modified resources
+    # Check modified and unchanged resources
     local modified_json="[]"
+    local unchanged_json="[]"
     while IFS= read -r id; do
         [[ -z "${id}" ]] && continue
         local base_resource
@@ -99,6 +100,8 @@ compare_resources() {
                 --argjson changes "${changes}" \
                 '{id: $id, name: $name, type: $type, changedProperties: $changes}')
             modified_json=$(echo "${modified_json}" | jq --argjson entry "${modified_entry}" '. + [$entry]')
+        else
+            unchanged_json=$(echo "${unchanged_json}" | jq --argjson res "${head_resource}" '. + [$res]')
         fi
     done <<< "${common_ids}"
     
@@ -107,7 +110,8 @@ compare_resources() {
         --argjson added "${added_json}" \
         --argjson removed "${removed_json}" \
         --argjson modified "${modified_json}" \
-        '{addedResources: $added, removedResources: $removed, modifiedResources: $modified}'
+        --argjson unchanged "${unchanged_json}" \
+        '{addedResources: $added, removedResources: $removed, modifiedResources: $modified, unchangedResources: $unchanged}'
 }
 
 # Compare connections between two graphs
@@ -128,6 +132,10 @@ compare_connections() {
     # Find removed connections (in base but not in head)
     local removed_keys
     removed_keys=$(comm -23 <(echo "${base_keys}") <(echo "${head_keys}"))
+
+    # Find unchanged connections (in both base and head)
+    local unchanged_keys
+    unchanged_keys=$(comm -12 <(echo "${base_keys}") <(echo "${head_keys}"))
 
     # Build added connections array
     local added_json="[]"
@@ -157,10 +165,25 @@ compare_connections() {
         removed_json=$(echo "${removed_json}" | jq --argjson c "${conn}" '. + [$c]')
     done <<< "${removed_keys}"
 
+    # Build unchanged connections array
+    local unchanged_json="[]"
+    while IFS= read -r key; do
+        [[ -z "${key}" ]] && continue
+        local src tgt
+        src="${key%%->*}"
+        tgt="${key##*->}"
+        local conn
+        conn=$(echo "${head}" | jq --arg s "${src}" --arg t "${tgt}" \
+            '[.connections[] | select(.sourceId == $s and .targetId == $t)] | first')
+        [[ "${conn}" == "null" ]] && continue
+        unchanged_json=$(echo "${unchanged_json}" | jq --argjson c "${conn}" '. + [$c]')
+    done <<< "${unchanged_keys}"
+
     jq -n \
         --argjson added "${added_json}" \
         --argjson removed "${removed_json}" \
-        '{addedConnections: $added, removedConnections: $removed}'
+        --argjson unchanged "${unchanged_json}" \
+        '{addedConnections: $added, removedConnections: $removed, unchangedConnections: $unchanged}'
 }
 
 # Compute diff summary
@@ -194,7 +217,7 @@ main() {
     echo "Computing graph diff between ${BASE_REF} and ${HEAD_REF}"
     
     # Process each graph file
-    local combined_diff='{"addedResources":[],"removedResources":[],"modifiedResources":[],"addedConnections":[],"removedConnections":[]}'
+    local combined_diff='{"addedResources":[],"removedResources":[],"modifiedResources":[],"unchangedResources":[],"addedConnections":[],"removedConnections":[],"unchangedConnections":[]}'
     
     IFS=',' read -ra files <<< "${GRAPH_FILES}"
     for file in "${files[@]}"; do
@@ -217,8 +240,10 @@ main() {
             .[0].addedResources += .[1].addedResources |
             .[0].removedResources += .[1].removedResources |
             .[0].modifiedResources += .[1].modifiedResources |
+            .[0].unchangedResources += .[1].unchangedResources |
             .[0].addedConnections += .[2].addedConnections |
             .[0].removedConnections += .[2].removedConnections |
+            .[0].unchangedConnections += .[2].unchangedConnections |
             .[0]' <(echo "${combined_diff}") <(echo "${file_diff}") <(echo "${conn_diff}"))
     done
     
