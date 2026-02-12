@@ -221,7 +221,6 @@ EOF
 
     cat << 'EOF'
     classDef removed fill:#FFB6C1,stroke:#DC143C
-    classDef unchanged fill:#F0F0F0,stroke:#808080
 ```
 
 EOF
@@ -314,18 +313,17 @@ main() {
     badges=$(render_badges "${diff}")
     [[ -n "${badges}" ]] && body+="${badges}"$'\n\n'
     
-    # Collapsible details
-    body+="<details>"$'\n'
-    body+="<summary>View Details</summary>"$'\n\n'
-    
-    # Mermaid diagrams (before/after views)
+    # Mermaid diagrams rendered outside <details> to avoid GitHub rendering issues
     # Note: $() strips trailing newlines, so we append them explicitly
     # to prevent sections from running together.
     if [[ "${INCLUDE_MERMAID}" == "true" ]]; then
-        body+="### Graph Visualization"$'\n\n'
         body+="$(render_mermaid_before "${diff}")"$'\n\n'
         body+="$(render_mermaid_after "${diff}")"$'\n\n'
     fi
+    
+    # Collapsible details for change tables
+    body+="<details>"$'\n'
+    body+="<summary>View Details</summary>"$'\n\n'
     
     # Change sections
     body+="$(render_added_section "${diff}")"$'\n\n'
