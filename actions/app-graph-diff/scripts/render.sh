@@ -168,7 +168,7 @@ EOF
 
     # Render resource nodes (name + type in parentheses)
     echo "${diff}" | jq -r '.addedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::added"'
-    echo "${diff}" | jq -r '.removedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"` ~~" + (.name // .id) + " (" + (.type // "") + ")~~ `\"]:::removed"'
+    echo "${diff}" | jq -r '.removedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"`~~" + (.name // .id) + " (" + (.type // "") + ")~~`\"]:::removed"'
     echo "${diff}" | jq -r '.modifiedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::modified"'
     echo "${diff}" | jq -r '.unchangedResources[]? | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::unchanged"'
 
