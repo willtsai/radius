@@ -166,10 +166,10 @@ render_mermaid() {
 graph LR
 EOF
 
-    # Render resource nodes (name + type on separate lines)
-    echo "${diff}" | jq -r '.addedResources[] | "    \(.id | gsub("[^a-zA-Z0-9]"; "_"))[\"\(.name // .id)<br/><i>\(.type // \"\")</i>\"]:::added"'
-    echo "${diff}" | jq -r '.removedResources[] | "    \(.id | gsub("[^a-zA-Z0-9]"; "_"))[\"\(.name // .id)<br/><i>\(.type // \"\")</i>\"]:::removed"'
-    echo "${diff}" | jq -r '.modifiedResources[] | "    \(.id | gsub("[^a-zA-Z0-9]"; "_"))[\"\(.name // .id)<br/><i>\(.type // \"\")</i>\"]:::modified"'
+    # Render resource nodes (name + type in parentheses)
+    echo "${diff}" | jq -r '.addedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::added"'
+    echo "${diff}" | jq -r '.removedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::removed"'
+    echo "${diff}" | jq -r '.modifiedResources[] | "    " + (.id | gsub("[^a-zA-Z0-9]"; "_")) + "[\"" + (.name // .id) + " (" + (.type // "") + ")\"]:::modified"'
 
     # Render connection edges with link styles
     # Track link index for linkStyle directives (Mermaid numbers links sequentially)
