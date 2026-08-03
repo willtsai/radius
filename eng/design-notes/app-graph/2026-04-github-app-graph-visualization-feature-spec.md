@@ -39,6 +39,10 @@ When a pull request that modifies the app code and/or definition is merged to `m
 
 When a user clicks on the link to the application graph in the repository root, they are taken to a dedicated page that shows the modeled application graph based on the app definition file. From this page, they can also point the app graph to an available Environment to see a view of the planned application graph that depicts the expected (but not yet deployed) infrastructure based on the Environment configurations (e.g. settings, Recipes, etc.). Finally, once the user has successfully deployed the application, they can view the deployed application graph(s) that reflect the actual state of the deployed infrastructure. Each graph visualization is interactive and allows navigation to relevant code and infrastructure resources where applicable.
 
+### Scenario 4: Embeddable app graph widget for README files and GitHub profiles (P2)
+
+A developer can embed a live app graph visualization into any Markdown file, such as a repository README or a GitHub profile README, using a standard Markdown image/link embed. The widget renders the latest app graph from the repository's default branch as an SVG, so it always reflects the current application architecture without manual updates. Developers can also showcase the app graphs for all the applications they maintain by embedding multiple widgets in their GitHub profile README, creating a visual portfolio of their application architectures.
+
 ## Current state
 
 Radius has an existing Application Graph feature that operates at runtime:
@@ -194,3 +198,60 @@ When the user clicks on a failed resource (e.g. the `demo:latest` container imag
 #### _Planned_ app graph (P2)
 
 TBD
+
+### Embeddable app graph widget (P2)
+
+Radius provides an embeddable widget that renders the latest app graph from a repository's default branch as an SVG image. Because the widget is a standard Markdown image embed, it works anywhere Markdown is rendered — repository READMEs, GitHub profile READMEs, wikis, documentation sites, or any web page that supports `<img>` tags.
+
+#### Embedding in a repository README
+
+A developer wants their repository README to always display the current application architecture without manually updating screenshots. They add a Markdown image embed that points to the Radius widget service:
+
+```markdown
+## Application Architecture
+
+[![Application Graph](https://radius.dev/widget/app-graph/{owner}/{repo})](https://github.com/{owner}/{repo}/radius/app-graph)
+```
+
+The widget service generates an SVG of the latest app graph from the default branch of the specified repository. Every time the README is viewed, the SVG reflects the most recent application topology — no manual regeneration or CI step is required.
+
+The rendered widget shows a read-only, static snapshot of the modeled app graph. Clicking the image navigates to the dedicated interactive app graph page for the repository (as described in Scenario 3).
+
+#### Customization options
+
+The widget URL supports optional query parameters for customization:
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `theme` | Color theme: `light`, `dark`, or `auto` (matches GitHub's current theme) | `auto` |
+| `title` | Whether to render the application name as a title above the graph | `true` |
+| `compact` | Render a compact/simplified version of the graph for smaller viewports | `false` |
+
+Example with options:
+
+```markdown
+![Application Graph](https://radius.dev/widget/app-graph/{owner}/{repo}?theme=dark&compact=true)
+```
+
+#### Showcasing app graphs on a GitHub profile
+
+Because GitHub profile pages are powered by a `README.md` in the user's profile repository (`{username}/{username}`), the same widget embed works for building a visual portfolio of application architectures. A developer who maintains multiple Radius applications can add a section to their profile README:
+
+```markdown`
+## My Applications
+
+| App | Architecture |
+|-----|--------------|
+| [Todo App](https://github.com/user/todo-app) | [![App Graph](https://radius.dev/widget/app-graph/user/todo-app?compact=true)](https://github.com/user/todo-app/radius/app-graph) |
+| [E-Commerce](https://github.com/user/ecommerce) | [![App Graph](https://radius.dev/widget/app-graph/user/ecommerce?compact=true)](https://github.com/user/ecommerce/radius/app-graph) |
+| [Data Pipeline](https://github.com/user/data-pipeline) | [![App Graph](https://radius.dev/widget/app-graph/user/data-pipeline?compact=true)](https://github.com/user/data-pipeline/radius/app-graph) |
+```
+
+This renders a table of applications with their live app graph visualizations, giving visitors an at-a-glance understanding of the developer's application portfolio and architectural style.
+
+#### Widget service behavior
+
+- **Source of truth**: The widget service reads the compiled app graph from the default branch of the target repository. It uses the same static analysis pipeline that powers the README auto-update (Scenario 2) to generate the graph.
+- **Caching**: The generated SVG is cached with a short TTL (e.g. 5 minutes) to balance freshness with performance. GitHub's image proxy (`camo.githubusercontent.com`) may apply additional caching.
+- **Access control**: The widget respects repository visibility. For private repositories, the widget returns a placeholder image indicating that the graph is not publicly available. Authenticated requests (e.g. via a token query parameter) may be supported in a future iteration.
+- **Fallback**: If no app definition is found in the repository or the graph cannot be generated, the widget returns a placeholder SVG with a message such as "No Radius application found" rather than a broken image.
